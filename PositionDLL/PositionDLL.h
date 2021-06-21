@@ -40,6 +40,16 @@ extern "C" POSITION_API int clicks();
 
 extern "C" POSITION_API void datain(double output);
 
-extern "C" POSITION_API double plane();
+extern "C" POSITION_API double ppx();
+
+extern "C" POSITION_API double ppy();
+
+extern "C" POSITION_API double ppz();
+
+extern "C" POSITION_API double pnx();
+
+extern "C" POSITION_API double pny();
+
+extern "C" POSITION_API double pnz();
 
 //extern "C" POSITION_API string planecalc();

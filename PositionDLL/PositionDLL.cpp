@@ -65,7 +65,7 @@ int bcurrent = 0;
 int blast = 0;
 
 double h = 20;
-
+hduVector3Dd n;
 int wait = 2000;
 
 hduVector3Dd point1, point2, point3;
@@ -79,7 +79,14 @@ typedef struct
 
 static DeviceData gServoDeviceData;
 
+//This finds plane atributes
 
+void plane() {
+    hduVector3Dd a = point2 - point1;
+    hduVector3Dd b = point3 - point1;
+    n = a.crossProduct(b);
+    n = frac(1, n.magnitude()) * n;
+}
 
 /*******************************************************************************
  Haptic plane callback.  The plane is oriented along Y=0 and provides a
@@ -101,7 +108,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     // -1 means the plane is facing -Y.
     const double wallStiffness = 0.25;
 
-    int forcetrigger = 4;
+    int forcetrigger = 3;
 
 
     hdBeginFrame(hdGetCurrentDevice());
@@ -227,6 +234,9 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             else {
                 point3 = {position[0], dataout, position[2]};
                 sequence++;
+
+                plane();
+
             }
         }
     }
@@ -380,8 +390,50 @@ __declspec(dllexport) void datain(double output) {
     dataout = output;
 }
 
-__declspec(dllexport) double plane() {
+double mapx(double xunmap) {
+    double xvar;
+    if (scalex * (xunmap - xzero) >= imgsize) {
+        xvar = imgsize;
+    }
+    else if (scalex * (xunmap - xzero) <= 0) {
+        xvar = 0;
+    }
+    else {
+        xvar = scalex * (xunmap - xzero);
+    }
+    return xvar;
+}
+double mapz(double zunmap) {
+    double zvar;
+    if (scalez * (zzero - zunmap) >= imgsize) {
+        zvar = imgsize;
+    }
+    else if (scalez * (zzero - zunmap) <= 0) {
+        zvar = 0;
+    }
+    else {
+        zvar = scalez * (zzero - zunmap);
+    }
+    return zvar;
+}
+
+__declspec(dllexport) double ppx() {
+    return std::floor(frac(sizeofbox, imgsize) * mapx(point1[0]) + xpoint);
+}
+__declspec(dllexport) double ppy() {
     return point1[1];
+}
+__declspec(dllexport) double ppz() {
+    return std::floor(frac(sizeofbox, imgsize) * mapz(point1[2]) + zpoint);
+}
+__declspec(dllexport) double pnx() {
+    return n[0];
+}
+__declspec(dllexport) double pny() {
+    return n[1];
+}
+__declspec(dllexport) double pnz() {
+    return n[2];
 }
 
 __declspec(dllexport) void shutdown() {
