@@ -38,4 +38,8 @@ extern "C" POSITION_API double getpsi();
 
 extern "C" POSITION_API int clicks();
 
+extern "C" POSITION_API void datain(double output);
+
+extern "C" POSITION_API double plane();
+
 //extern "C" POSITION_API string planecalc();

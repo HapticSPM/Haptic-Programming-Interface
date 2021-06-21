@@ -58,9 +58,15 @@ double xmap0;
 double zmap0;
 
 int sequence = 0;
+double dataout = 0;
+int frames = 0;
 
 int bcurrent = 0;
 int blast = 0;
+
+double h = 20;
+
+int wait = 2000;
 
 hduVector3Dd point1, point2, point3;
 
@@ -74,12 +80,15 @@ typedef struct
 static DeviceData gServoDeviceData;
 
 
+
 /*******************************************************************************
  Haptic plane callback.  The plane is oriented along Y=0 and provides a
  repelling force if the device attempts to penetrates through it.
 *******************************************************************************/
 HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 {
+    hdEnable(HD_MAX_FORCE_CLAMPING);
+
     // Stiffnes, i.e. k value, of the plane.  Higher stiffness results
     // in a harder surface.
     const double planeStiffness = 0.25;
@@ -90,10 +99,10 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     // force to popthrough it.
     // 1 means the plane is facing +Y.
     // -1 means the plane is facing -Y.
-    static int directionFlag = 1;
     const double wallStiffness = 0.25;
 
-    sequence = 0;
+    int forcetrigger = 4;
+
 
     hdBeginFrame(hdGetCurrentDevice());
     
@@ -113,13 +122,6 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 
     bcurrent = nCurrentButtons;
     blast = nLastButtons;
-
-    if (bcurrent + blast == 2) {
-        if (sequence == 0)
-        {
-            point1 = position[1]
-        }
-    }
 
     //These map the raw position of the arm to a 159x159 canvas.
         //Both are bounded by [0, 160].
@@ -187,29 +189,55 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     }
     else {
         forcez = -1 * coeffz * velocity[2];
-    }
- 
-    if
+    }   
 
-        double h = height;
-
-    if ((position[1] <= h && directionFlag > 0) ||
-        (position[1] > h) && (directionFlag < 0))
+    if (position[1] <= h )
     {
         double penetrationDistance = fabs(position[1] - h);
-        double forceDirection = directionFlag;
-
         // Hooke's law explicitly:
         double k = planeStiffness;
-        double x = penetrationDistance * forceDirection;
+        double x = penetrationDistance;
         forcey = k * x;
+    }
+    else {
+        forcey = 0;
     }
     
     
     hduVector3Dd finalforce(forcex, forcey, forcez);
     hdSetDoublev(HD_CURRENT_FORCE, finalforce);
         
-    
+    hduVector3Dd lastforce;
+    hdGetDoublev(HD_LAST_FORCE, lastforce);
+    hduVector3Dd currentforce;
+    hdGetDoublev(HD_CURRENT_FORCE, currentforce);
+
+    if (sequence <= 2 && frames == wait) {
+        h = 20;
+        if ((currentforce[1] <= forcetrigger) && (lastforce[1] >= forcetrigger)) {
+            frames = 0;
+            if (sequence == 0) {
+                point1 = {position[0], dataout, position[2]};
+                sequence++;
+            }
+            else if (sequence == 1) {
+                point2 = {position[0], dataout, position[2] };
+                sequence++;
+            }
+            else {
+                point3 = {position[0], dataout, position[2]};
+                sequence++;
+            }
+        }
+    }
+    else {
+        h = height;
+    }
+
+    if (frames < wait) {
+        frames++;
+    }
+
     hdEndFrame(hdGetCurrentDevice());
 
     // In case of error, terminate the callback.
@@ -342,16 +370,27 @@ __declspec(dllexport) void config(double ypos, int x0, int z0, int scope, int si
     scalez = frac(imgsize, 120);
 }
 
+__declspec(dllexport) int clicks() {
+    double seq;
+    seq = sequence;
+    return seq;
+}
+
+__declspec(dllexport) void datain(double output) {
+    dataout = output;
+}
+
+__declspec(dllexport) double plane() {
+    return point1[1];
+}
 
 __declspec(dllexport) void shutdown() {
-        HHD hHD = hdInitDevice(HD_DEFAULT_DEVICE);
-        HDCallbackCode hPlaneCallback = hdScheduleAsynchronous(
-            FrictionlessPlaneCallback, 0, HD_DEFAULT_SCHEDULER_PRIORITY);
-        hdStopScheduler();
-        hdUnschedule(hPlaneCallback);
-        hdDisableDevice(hHD); 
+    sequence = 0;
+    HHD hHD = hdInitDevice(HD_DEFAULT_DEVICE);
+    HDCallbackCode hPlaneCallback = hdScheduleAsynchronous(
+    FrictionlessPlaneCallback, 0, HD_DEFAULT_SCHEDULER_PRIORITY);
+    hdStopScheduler();
+    hdUnschedule(hPlaneCallback);
+    hdDisableDevice(hHD); 
 }
 
-__declspec(dllexport) int clicks() {
-    return bcurrent + blast;
-}
