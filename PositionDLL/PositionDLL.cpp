@@ -34,7 +34,7 @@ double frac(double xin, double yin) {
 }
 
 //height of the plane
-double height = 50;
+double height = 20;
 
 //parameters for the initial 159x159 canvas
 double imgsize = 159;
@@ -60,6 +60,7 @@ double zmap0;
 int sequence = 0;
 double dataout = 0;
 int frames = 0;
+int wait;
 hduVector3Dd posLV = {0,0,0};
 
 int bcurrent = 0;
@@ -67,7 +68,6 @@ int blast = 0;
 
 double h = 20;
 hduVector3Dd n;
-int wait = 2000;
 
 hduVector3Dd point1 = { 0,0,0 };
 hduVector3Dd point2, point3;
@@ -99,7 +99,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 
     // Stiffnes, i.e. k value, of the plane.  Higher stiffness results
     // in a harder surface.
-    const double planeStiffness = 0.2;
+    const double planeStiffness = 0.35;
     // Amount of force the user needs to apply in order to pop through
     // the plane.
     const double popthroughForceThreshold = 3.0;
@@ -107,8 +107,9 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     // force to popthrough it.
     // 1 means the plane is facing +Y.
     // -1 means the plane is facing -Y.
-    const double wallStiffness = 0.2;
-
+    const double wallStiffness = 0.35;
+    
+    //Amount of force to trigger choosing point
     int forcetrigger = 2;
 
 
@@ -212,6 +213,14 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     }
     
     
+
+    if (sequence == 0) {
+        wait = 3500;
+    }
+    else {
+        wait = 1500;
+    }
+    
     hduVector3Dd finalforce(forcex, forcey, forcez);
     hdSetDoublev(HD_CURRENT_FORCE, finalforce);
         
@@ -221,7 +230,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     hdGetDoublev(HD_CURRENT_FORCE, currentforce);
 
     if (sequence <= 2 && frames == wait) {
-        h = 20;
+        h = height;
         if ((currentforce[1] <= forcetrigger) && (lastforce[1] >= forcetrigger)) {
             frames = 0;
             if (sequence == 0) {
