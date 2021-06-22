@@ -38,13 +38,15 @@ extern "C" POSITION_API double getpsi();
 
 extern "C" POSITION_API int clicks();
 
-extern "C" POSITION_API void datain(double output);
+extern "C" POSITION_API void datain(double xin, double output, double zin);
 
-extern "C" POSITION_API double ppx();
+extern "C" POSITION_API double pd();
 
-extern "C" POSITION_API double ppy();
-
-extern "C" POSITION_API double ppz();
+//extern "C" POSITION_API double ppx();
+//
+//extern "C" POSITION_API double ppy();
+//
+//extern "C" POSITION_API double ppz();
 
 extern "C" POSITION_API double pnx();
 

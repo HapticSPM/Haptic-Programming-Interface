@@ -60,6 +60,7 @@ double zmap0;
 int sequence = 0;
 double dataout = 0;
 int frames = 0;
+hduVector3Dd posLV = {0,0,0};
 
 int bcurrent = 0;
 int blast = 0;
@@ -68,7 +69,8 @@ double h = 20;
 hduVector3Dd n;
 int wait = 2000;
 
-hduVector3Dd point1, point2, point3;
+hduVector3Dd point1 = { 0,0,0 };
+hduVector3Dd point2, point3;
 
 typedef struct
 {
@@ -85,7 +87,6 @@ void plane() {
     hduVector3Dd a = point2 - point1;
     hduVector3Dd b = point3 - point1;
     n = a.crossProduct(b);
-    n = frac(1, n.magnitude()) * n;
 }
 
 /*******************************************************************************
@@ -98,7 +99,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 
     // Stiffnes, i.e. k value, of the plane.  Higher stiffness results
     // in a harder surface.
-    const double planeStiffness = 0.25;
+    const double planeStiffness = 0.2;
     // Amount of force the user needs to apply in order to pop through
     // the plane.
     const double popthroughForceThreshold = 3.0;
@@ -106,9 +107,9 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     // force to popthrough it.
     // 1 means the plane is facing +Y.
     // -1 means the plane is facing -Y.
-    const double wallStiffness = 0.25;
+    const double wallStiffness = 0.2;
 
-    int forcetrigger = 3;
+    int forcetrigger = 2;
 
 
     hdBeginFrame(hdGetCurrentDevice());
@@ -224,19 +225,17 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         if ((currentforce[1] <= forcetrigger) && (lastforce[1] >= forcetrigger)) {
             frames = 0;
             if (sequence == 0) {
-                point1 = {position[0], dataout, position[2]};
+                point1 = posLV;
                 sequence++;
             }
             else if (sequence == 1) {
-                point2 = {position[0], dataout, position[2] };
+                point2 = posLV;
                 sequence++;
             }
             else {
-                point3 = {position[0], dataout, position[2]};
+                point3 = posLV;
                 sequence++;
-
                 plane();
-
             }
         }
     }
@@ -352,6 +351,7 @@ __declspec(dllexport) double getforcez() {
     return force[2];
 }
 
+
 //Angles
 __declspec(dllexport) double gettheta() {
     hduVector3Dd angles;
@@ -386,8 +386,9 @@ __declspec(dllexport) int clicks() {
     return seq;
 }
 
-__declspec(dllexport) void datain(double output) {
+__declspec(dllexport) void datain(double xin, double output, double zin) {
     dataout = output;
+    posLV = { xin, output, zin };
 }
 
 double mapx(double xunmap) {
@@ -417,14 +418,17 @@ double mapz(double zunmap) {
     return zvar;
 }
 
-__declspec(dllexport) double ppx() {
-    return std::floor(frac(sizeofbox, imgsize) * mapx(point1[0]) + xpoint);
-}
-__declspec(dllexport) double ppy() {
-    return point1[1];
-}
-__declspec(dllexport) double ppz() {
-    return std::floor(frac(sizeofbox, imgsize) * mapz(point1[2]) + zpoint);
+//__declspec(dllexport) double ppx() {
+//    return std::floor(frac(sizeofbox, imgsize) * mapx(point1[0]) + xpoint);
+//}
+//__declspec(dllexport) double ppy() {
+//    return point1[1];
+//}
+//__declspec(dllexport) double ppz() {
+//    return std::floor(frac(sizeofbox, imgsize) * mapz(point1[2]) + zpoint);
+//}
+__declspec(dllexport) double pd() {
+    return -1 * (n[0] * point1[0] + n[1] * point1[1] + n[2] * point1[2]);
 }
 __declspec(dllexport) double pnx() {
     return n[0];
