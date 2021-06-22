@@ -33,8 +33,11 @@ double frac(double xin, double yin) {
     return xin / yin;
 }
 
-//height of the plane
+//height of the plane from LabView
 double height = 20;
+
+//initial height of plane
+double h = 20;
 
 //parameters for the initial 159x159 canvas
 double imgsize = 159;
@@ -57,56 +60,39 @@ double forcez = 0;
 double xmap0;
 double zmap0;
 
+int count = 0;
+
+//params for clicking sequence, waits a certain amount before the subsequent click
 int sequence = 0;
-double dataout = 0;
 int frames = 0;
 int wait;
+
+//ouput value from LabView data
+double dataout = 0;
+
+//input position from LabView (to make flipping data easier)
 hduVector3Dd posLV = {0,0,0};
 
-int bcurrent = 0;
-int blast = 0;
-
-double h = 20;
+//normal & points for plane
 hduVector3Dd n;
-
 hduVector3Dd point1 = { 0,0,0 };
 hduVector3Dd point2, point3;
 
-typedef struct
-{
-    HDboolean m_buttonState;       /* Has the device button has been pressed. */
-    hduVector3Dd m_devicePosition; /* Current device coordinates. */
-    HDErrorInfo m_error;
-} DeviceData;
-
-static DeviceData gServoDeviceData;
-
-//This finds plane atributes
-
+//This calculates plane attributes
 void plane() {
     hduVector3Dd a = point2 - point1;
     hduVector3Dd b = point3 - point1;
     n = a.crossProduct(b);
 }
 
-/*******************************************************************************
- Haptic plane callback.  The plane is oriented along Y=0 and provides a
- repelling force if the device attempts to penetrates through it.
-*******************************************************************************/
+//Haptic plane callback.
 HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 {
     hdEnable(HD_MAX_FORCE_CLAMPING);
 
-    // Stiffnes, i.e. k value, of the plane.  Higher stiffness results
+    // Stiffness, i.e. k value, of the plane.  Higher stiffness results
     // in a harder surface.
     const double planeStiffness = 0.35;
-    // Amount of force the user needs to apply in order to pop through
-    // the plane.
-    const double popthroughForceThreshold = 3.0;
-    // Plane direction changes whenever the user applies sufficient
-    // force to popthrough it.
-    // 1 means the plane is facing +Y.
-    // -1 means the plane is facing -Y.
     const double wallStiffness = 0.35;
     
     //Amount of force to trigger choosing point
@@ -123,17 +109,8 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     hduVector3Dd velocity;
     hdGetDoublev(HD_CURRENT_VELOCITY, velocity);
 
-    //Get the button states
-    HDint nCurrentButtons, nLastButtons;
-
-    hdGetIntegerv(HD_CURRENT_BUTTONS, &nCurrentButtons);
-    hdGetIntegerv(HD_LAST_BUTTONS, &nLastButtons);
-
-    bcurrent = nCurrentButtons;
-    blast = nLastButtons;
-
-    //These map the raw position of the arm to a 159x159 canvas.
-        //Both are bounded by [0, 160].
+    //These if statements map the raw position of the arm to a imgsize x imgsize canvas.
+    //Both are bounded by [0, imgsize].
     if (scalex * (position[0] - xzero) >= imgsize) {
         xmap0 = imgsize;
     }
@@ -154,16 +131,12 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         zmap0 = scalez * (zzero - position[2]);
     }
 
-
-
     //Sets drag coefficients
     double coeffx = 0.001;
     double coeffz = 0.002;
 
-    // If the user has penetrated the plane, set the device force to 
-    // repel the user in the direction of the surface normal of the plane.
-    // Penetration occurs if the plane is facing in +Y and the user's Y position
-    // is negative, or vice versa.
+    //these if statements calculate the forces for the bounding box
+    //x:
     if (xmap0 == 0)
     {
         double penetrationDistancex = frac(159, imgsize) * fabs(scalex * (position[0] - xzero));
@@ -181,7 +154,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     else {
         forcex = -1 * coeffx * velocity[0];
     }
-
+    //z:
     if (zmap0 == 0)
     {
         double penetrationDistancex = frac(159, imgsize) * fabs(scalez * (zzero - position[2]));
@@ -200,6 +173,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         forcez = -1 * coeffz * velocity[2];
     }   
 
+    //Calculates y force depending on the input height from LabView (or the default value)
     if (position[1] <= h )
     {
         double penetrationDistance = fabs(position[1] - h);
@@ -213,7 +187,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     }
     
     
-
+    //Sets wait time between choosing points, 1st takes longer
     if (sequence == 0) {
         wait = 3500;
     }
@@ -221,14 +195,18 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         wait = 1500;
     }
     
+    //writes calculated forces to the device
     hduVector3Dd finalforce(forcex, forcey, forcez);
     hdSetDoublev(HD_CURRENT_FORCE, finalforce);
         
+    //Logs the current and last forces
     hduVector3Dd lastforce;
     hdGetDoublev(HD_LAST_FORCE, lastforce);
     hduVector3Dd currentforce;
     hdGetDoublev(HD_CURRENT_FORCE, currentforce);
 
+
+    //handles the sequence of choosing points on a plane
     if (sequence <= 2 && frames == wait) {
         h = height;
         if ((currentforce[1] <= forcetrigger) && (lastforce[1] >= forcetrigger)) {
@@ -295,8 +273,6 @@ __declspec(dllexport) int start()
     hdStartScheduler();
     if (HD_DEVICE_ERROR(error = hdGetError()))
     {
-        hduPrintError(stderr, &error, "Failed to start the scheduler");
-        fprintf(stderr, "\nPress any key to quit.\n");
         getch();
         return -1;
     }
@@ -306,18 +282,11 @@ __declspec(dllexport) int start()
     HDCallbackCode hPlaneCallback = hdScheduleAsynchronous(
         FrictionlessPlaneCallback, 0, HD_DEFAULT_SCHEDULER_PRIORITY);
 
-    printf("Plane example.\n");
-    printf("Move the device up and down to feel a plane along Y=0.\n");
-    printf("Push hard against the plane to popthrough to the other side.\n");
-    printf("Press any key to quit.\n\n");
-
     while (!_kbhit())
     {
         return 3;
         if (!hdWaitForCompletion(hPlaneCallback, HD_WAIT_CHECK_STATUS))
         {
-            fprintf(stderr, "\nThe main scheduler callback has exited\n");
-            fprintf(stderr, "\nPress any key to quit.\n");
             getch();
             break;
         }
@@ -343,7 +312,7 @@ __declspec(dllexport) int getposz() {
     return std::floor(frac(sizeofbox, imgsize) * zmap0 + zpoint);
 }
 
-//Forces
+//Exports forces to LabView
 __declspec(dllexport) double getforcex() {
     hduVector3Dd force;
     hdGetDoublev(HD_CURRENT_FORCE, force);
@@ -361,7 +330,7 @@ __declspec(dllexport) double getforcez() {
 }
 
 
-//Angles
+//Exports angles to LabView
 __declspec(dllexport) double gettheta() {
     hduVector3Dd angles;
     hdGetDoublev(HD_CURRENT_GIMBAL_ANGLES, angles);
@@ -378,7 +347,7 @@ __declspec(dllexport) double getpsi() {
     return angles[2];
 }
 
-//Parameters
+//Parameters from LabView
 __declspec(dllexport) void config(double ypos, int x0, int z0, int scope, int sizeofimg) {
     height = ypos;
     xpoint = x0;
@@ -389,17 +358,20 @@ __declspec(dllexport) void config(double ypos, int x0, int z0, int scope, int si
     scalez = frac(imgsize, 120);
 }
 
+//counts the number of clicks
 __declspec(dllexport) int clicks() {
     double seq;
     seq = sequence;
     return seq;
 }
 
+//Imports position data from LabView (to allow flipping of data)
 __declspec(dllexport) void datain(double xin, double output, double zin) {
     dataout = output;
     posLV = { xin, output, zin };
 }
 
+//maps data (probably could replace in HDCALLBACK to make more efficient)
 double mapx(double xunmap) {
     double xvar;
     if (scalex * (xunmap - xzero) >= imgsize) {
@@ -427,15 +399,7 @@ double mapz(double zunmap) {
     return zvar;
 }
 
-//__declspec(dllexport) double ppx() {
-//    return std::floor(frac(sizeofbox, imgsize) * mapx(point1[0]) + xpoint);
-//}
-//__declspec(dllexport) double ppy() {
-//    return point1[1];
-//}
-//__declspec(dllexport) double ppz() {
-//    return std::floor(frac(sizeofbox, imgsize) * mapz(point1[2]) + zpoint);
-//}
+//Exports plane attributes to LabView
 __declspec(dllexport) double pd() {
     return -1 * (n[0] * point1[0] + n[1] * point1[1] + n[2] * point1[2]);
 }
@@ -449,6 +413,7 @@ __declspec(dllexport) double pnz() {
     return n[2];
 }
 
+//Shuts down device
 __declspec(dllexport) void shutdown() {
     sequence = 0;
     HHD hHD = hdInitDevice(HD_DEFAULT_DEVICE);
