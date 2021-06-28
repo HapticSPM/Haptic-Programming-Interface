@@ -36,20 +36,27 @@ double frac(double xin, double yin) {
 //height of the plane from LabView
 double height = 20;
 
+double xorigin = 0;
+double zorigin = 0;
+
 //initial height of plane
 double h = 20;
 
 //parameters for the initial 159x159 canvas
-double imgsize = 159;
+double imgsizex = 159;
+double imgsizez = 159;
+double imgsize = imgsizex;
 const double xzero = -60;
 const double zzero = 80;
-double scalex = frac(imgsize, 120);
-double scalez = frac(imgsize, 120);
+double scalex = frac(imgsizex, 120);
+double scalez = frac(imgsizez, 120);
 
 //parameters for the zoomed in canvas
-double xpoint = 0;
-double zpoint = 0;
 double sizeofbox = 159;
+
+//Sets drag coefficients
+double coeffx = 0.001;
+double coeffz = coeffx;
 
 //the force component in each direction
 double forcex = 0;
@@ -67,8 +74,13 @@ int sequence = 0;
 int frames = 0;
 int wait;
 
+const int lastframes = 100;
+std::vector<hduVector3Dd> lastvel(lastframes);
+bool testvar = false;
+hduVector3Dd avgvel;
 //ouput value from LabView data
 double dataout = 0;
+
 
 //input position from LabView (to make flipping data easier)
 hduVector3Dd posLV = {0,0,0};
@@ -77,6 +89,7 @@ hduVector3Dd posLV = {0,0,0};
 hduVector3Dd n;
 hduVector3Dd point1 = { 0,0,0 };
 hduVector3Dd point2, point3;
+hduVector3Dd vel = { 0,0,0 };
 
 //This calculates plane attributes
 void plane() {
@@ -109,10 +122,12 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     hduVector3Dd velocity;
     hdGetDoublev(HD_CURRENT_VELOCITY, velocity);
 
+    vel = velocity;
+
     //These if statements map the raw position of the arm to a imgsize x imgsize canvas.
     //Both are bounded by [0, imgsize].
-    if (scalex * (position[0] - xzero) >= imgsize) {
-        xmap0 = imgsize;
+    if (scalex * (position[0] - xzero) >= imgsizex) {
+        xmap0 = imgsizex;
     }
     else if (scalex * (position[0] - xzero) <= 0) {
         xmap0 = 0;
@@ -121,8 +136,8 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         xmap0 = scalex * (position[0] - xzero);
     }
 
-    if (scalez * (zzero - position[2]) >= imgsize) {
-        zmap0 = imgsize;
+    if (scalez * (zzero - position[2]) >= imgsizez) {
+        zmap0 = imgsizez;
     }
     else if (scalez * (zzero - position[2]) <= 0) {
         zmap0 = 0;
@@ -131,25 +146,24 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         zmap0 = scalez * (zzero - position[2]);
     }
 
-    //Sets drag coefficients
-    double coeffx = 0.001;
-    double coeffz = 0.002;
+   
 
     //these if statements calculate the forces for the bounding box
     //x:
     if (xmap0 == 0)
     {
-        double penetrationDistancex = frac(159, imgsize) * fabs(scalex * (position[0] - xzero));
+        double penetrationDistancex = frac(159, imgsizex) * fabs(scalex * (position[0] - xzero));
         double kx = wallStiffness;
         double xx = penetrationDistancex;
         forcex = kx * xx;
     }
-    else if (xmap0 == imgsize)
+    else if (xmap0 == imgsizex)
     {
-        double penetrationDistancex = frac(159, imgsize) * fabs(imgsize - scalex * (position[0] - xzero));
+        double penetrationDistancex = frac(159, imgsizex) * fabs(imgsizex - scalex * (position[0] - xzero));
         double kx = wallStiffness;
         double xx = penetrationDistancex;
         forcex = -1 * kx * xx;
+ 
     }
     else {
         forcex = -1 * coeffx * velocity[0];
@@ -157,20 +171,20 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     //z:
     if (zmap0 == 0)
     {
-        double penetrationDistancex = frac(159, imgsize) * fabs(scalez * (zzero - position[2]));
+        double penetrationDistancex = frac(159, imgsizez) * fabs(scalez * (zzero - position[2]));
         double kz = wallStiffness;
         double xz = penetrationDistancex;
         forcez = -1 * kz * xz;
     }
-    else if (zmap0 == imgsize)
+    else if (zmap0 == imgsizez)
     {
-        double penetrationDistancex = frac(159, imgsize) * fabs(imgsize - scalez * (zzero - position[2]));
+        double penetrationDistancex = frac(159, imgsizez) * fabs(imgsizez - scalez * (zzero - position[2]));
         double kz = wallStiffness;
         double xz = penetrationDistancex;
         forcez = kz * xz;
     }
     else {
-        forcez = -1 * coeffz * velocity[2];
+        forcez = -2 * coeffz * velocity[2];
     }   
 
     //Calculates y force depending on the input height from LabView (or the default value)
@@ -181,6 +195,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         double k = planeStiffness;
         double x = penetrationDistance;
         forcey = k * x;
+       
     }
     else {
         forcey = 0;
@@ -196,7 +211,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     }
     
     //writes calculated forces to the device
-    hduVector3Dd finalforce(forcex, forcey, forcez);
+    hduVector3Dd finalforce = { forcex, forcey, forcez };
     hdSetDoublev(HD_CURRENT_FORCE, finalforce);
         
     //Logs the current and last forces
@@ -223,6 +238,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
                 point3 = posLV;
                 sequence++;
                 plane();
+                frames = 0;
             }
         }
     }
@@ -230,8 +246,38 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         h = height;
     }
 
-    if (frames < wait) {
+    if (frames < wait && sequence < 3) {
         frames++;
+    }
+
+    
+    if (sequence == 3) {
+        lastvel[frames] = velocity;
+    }
+    hduVector3Dd x;
+
+    if (testvar == 1) {
+        for (int i = 0; i < lastframes; i++) {
+            if (i == 0) {
+                x = lastvel[i];
+            }
+            else {
+                x = x + lastvel[i];
+            }
+        }
+        x = x / lastframes;
+        avgvel = x;
+    }
+    
+    if (sequence == 3) {
+        if (frames < lastframes - 1) {
+            frames++;
+
+        }
+        else {
+            frames = 0;
+            testvar = 1;
+        }
     }
 
     hdEndFrame(hdGetCurrentDevice());
@@ -300,16 +346,16 @@ __declspec(dllexport) int start()
 }
 
 //Positions: These map the position on the canvas to desired scope of the data
-__declspec(dllexport) int getposx() {
-    return std::floor(frac(sizeofbox, imgsize) * xmap0 + xpoint);
+__declspec(dllexport) double getposx() {
+    return frac(sizeofbox, imgsizex) * xmap0 + xorigin;
 }
 __declspec(dllexport) double getposy() {
     hduVector3Dd position;
     hdGetDoublev(HD_CURRENT_POSITION, position);
     return position[1];
 }
-__declspec(dllexport) int getposz() {
-    return std::floor(frac(sizeofbox, imgsize) * zmap0 + zpoint);
+__declspec(dllexport) double getposz() {
+    return frac(sizeofbox, imgsizez) * zmap0 + zorigin;
 }
 
 //Exports forces to LabView
@@ -348,14 +394,21 @@ __declspec(dllexport) double getpsi() {
 }
 
 //Parameters from LabView
-__declspec(dllexport) void config(double ypos, int x0, int z0, int scope, int sizeofimg) {
+__declspec(dllexport) void config(double ypos, int scope, int sizeofimgx, int sizeofimgz, double dragc) {
     height = ypos;
-    xpoint = x0;
-    zpoint = z0;
-    imgsize = sizeofimg;
+    imgsizex = sizeofimgx;
+    imgsizez = sizeofimgz;
     sizeofbox = scope;
-    scalex = frac(imgsize, 120);
-    scalez = frac(imgsize, 120);
+    scalex = frac(imgsizex, 120);
+    scalez = frac(imgsizez, 120);
+    coeffx = dragc;
+    coeffz = coeffx;
+    
+}
+
+__declspec(dllexport) void origin(double xorg, double zorg) {
+    xorigin = xorg;
+    zorigin = zorg;
 }
 
 //counts the number of clicks
@@ -374,8 +427,8 @@ __declspec(dllexport) void datain(double xin, double output, double zin) {
 //maps data (probably could replace in HDCALLBACK to make more efficient)
 double mapx(double xunmap) {
     double xvar;
-    if (scalex * (xunmap - xzero) >= imgsize) {
-        xvar = imgsize;
+    if (scalex * (xunmap - xzero) >= imgsizex) {
+        xvar = imgsizex;
     }
     else if (scalex * (xunmap - xzero) <= 0) {
         xvar = 0;
@@ -387,8 +440,8 @@ double mapx(double xunmap) {
 }
 double mapz(double zunmap) {
     double zvar;
-    if (scalez * (zzero - zunmap) >= imgsize) {
-        zvar = imgsize;
+    if (scalez * (zzero - zunmap) >= imgsizez) {
+        zvar = imgsizez;
     }
     else if (scalez * (zzero - zunmap) <= 0) {
         zvar = 0;
@@ -412,6 +465,19 @@ __declspec(dllexport) double pny() {
 __declspec(dllexport) double pnz() {
     return n[2];
 }
+
+__declspec(dllexport) double velx() {
+    return avgvel[0] * scalex * frac(sizeofbox, imgsizex);
+}
+
+__declspec(dllexport) double vely() {
+    return avgvel[1];
+}
+
+__declspec(dllexport) double velz() {
+    return avgvel[2] * scalez * frac(sizeofbox, imgsizez);
+}
+
 
 //Shuts down device
 __declspec(dllexport) void shutdown() {

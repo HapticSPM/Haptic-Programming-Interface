@@ -12,15 +12,15 @@
 #endif
 
 
-extern "C" POSITION_API void config(double ypos, int x0, int z0, int scope, int imagesize);
+extern "C" POSITION_API void config(double ypos, int scope, int sizeofimgx, int sizeofimgz, double dragc);
 
 extern "C" POSITION_API int start();
 
-extern "C" POSITION_API int getposx();
+extern "C" POSITION_API double getposx();
 
 extern "C" POSITION_API double getposy();
 
-extern "C" POSITION_API int getposz();
+extern "C" POSITION_API double getposz();
 
 extern "C" POSITION_API void shutdown();
 
@@ -42,16 +42,16 @@ extern "C" POSITION_API void datain(double xin, double output, double zin);
 
 extern "C" POSITION_API double pd();
 
-//extern "C" POSITION_API double ppx();
-//
-//extern "C" POSITION_API double ppy();
-//
-//extern "C" POSITION_API double ppz();
-
 extern "C" POSITION_API double pnx();
 
 extern "C" POSITION_API double pny();
 
 extern "C" POSITION_API double pnz();
 
-//extern "C" POSITION_API string planecalc();
+extern "C" POSITION_API void origin(double xorg, double zorg);
+
+extern "C" POSITION_API double velx();
+
+extern "C" POSITION_API double vely();
+
+extern "C" POSITION_API double velz();
