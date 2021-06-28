@@ -12,7 +12,7 @@
 #endif
 
 
-extern "C" POSITION_API void config(double ypos, int scope, int sizeofimgx, int sizeofimgz, double dragc);
+extern "C" POSITION_API void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc);
 
 extern "C" POSITION_API int start();
 

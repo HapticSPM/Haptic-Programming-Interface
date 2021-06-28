@@ -52,7 +52,8 @@ double scalex = frac(imgsizex, 120);
 double scalez = frac(imgsizez, 120);
 
 //parameters for the zoomed in canvas
-double sizeofbox = 159;
+double sizeofboxx = 159;
+double sizeofboxz = 159;
 
 //Sets drag coefficients
 double coeffx = 0.001;
@@ -347,7 +348,7 @@ __declspec(dllexport) int start()
 
 //Positions: These map the position on the canvas to desired scope of the data
 __declspec(dllexport) double getposx() {
-    return frac(sizeofbox, imgsizex) * xmap0 + xorigin;
+    return frac(sizeofboxx, imgsizex) * xmap0 + xorigin;
 }
 __declspec(dllexport) double getposy() {
     hduVector3Dd position;
@@ -355,7 +356,7 @@ __declspec(dllexport) double getposy() {
     return position[1];
 }
 __declspec(dllexport) double getposz() {
-    return frac(sizeofbox, imgsizez) * zmap0 + zorigin;
+    return frac(sizeofboxz, imgsizez) * zmap0 + zorigin;
 }
 
 //Exports forces to LabView
@@ -394,11 +395,12 @@ __declspec(dllexport) double getpsi() {
 }
 
 //Parameters from LabView
-__declspec(dllexport) void config(double ypos, int scope, int sizeofimgx, int sizeofimgz, double dragc) {
+__declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc) {
     height = ypos;
     imgsizex = sizeofimgx;
     imgsizez = sizeofimgz;
-    sizeofbox = scope;
+    sizeofboxx = scopex;
+    sizeofboxz = scopez;
     scalex = frac(imgsizex, 120);
     scalez = frac(imgsizez, 120);
     coeffx = dragc;
@@ -467,7 +469,7 @@ __declspec(dllexport) double pnz() {
 }
 
 __declspec(dllexport) double velx() {
-    return avgvel[0] * scalex * frac(sizeofbox, imgsizex);
+    return avgvel[0] * scalex * frac(sizeofboxx, imgsizex);
 }
 
 __declspec(dllexport) double vely() {
@@ -475,7 +477,7 @@ __declspec(dllexport) double vely() {
 }
 
 __declspec(dllexport) double velz() {
-    return avgvel[2] * scalez * frac(sizeofbox, imgsizez);
+    return avgvel[2] * scalez * frac(sizeofboxz, imgsizez);
 }
 
 
