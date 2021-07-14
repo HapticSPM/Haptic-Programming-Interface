@@ -37,7 +37,7 @@ double frac(double xin, double yin) {
 }
 
 
-
+double button;
 //height of the plane from LabView
 double height = 20;
 
@@ -45,7 +45,7 @@ double xorigin = 0;
 double zorigin = 0;
 
 
-
+bool doonce = false;
 
 //initial height of plane
 double h = 20;
@@ -116,8 +116,12 @@ double zinlast;
 double forceynodragcurrent;
 double forceynodraglast;
 
-double ylabviewlast;
-double ylabviewcurrent;
+double ylabviewlast = 0;
+double ylabviewcurrent = 0;
+
+double planeheight;
+
+double shift = -0.5;
 
 
 //input position from LabView (to make flipping data easier)
@@ -266,15 +270,16 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             forcey = 0;
         }*/
         
-
+        //forcey = std::log(current / (0.5 * setpointcurrent) + 1);
         if (current > c * setpointcurrent) {
-            forcey = std::log(current / (0.5 * setpointcurrent));
+            forcey = std::log(current / (0.25 * setpointcurrent));
         }
         else if (current < mincurrent) {
             forcey = 0;
         }
         else {
-            forcey = std::log(c / 0.5) / (c * setpointcurrent) * current;
+            forcey = (std::log(4 * c) / std::log(c * setpointcurrent + 1)) * std::log(current + 1);
+            //forcey = std::log(c / 0.5) / (c * setpointcurrent) * current;
         }
 
         if (forcey > maxforce) {
@@ -288,9 +293,9 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     forceynodraglast = forceynodragcurrent;
     forceynodragcurrent = forcey;
 
-    if (current <= setpointcurrent) {
+    //if (current <= 5) {
         forcey = -2 * coeffz * velocity[1] + forcey;
-    }
+    //}
 
     
     //Sets wait time between choosing points, 1st takes longer
@@ -305,7 +310,10 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     hduVector3Dd finalforce = { forcex, forcey, forcez };
     hdSetDoublev(HD_CURRENT_FORCE, finalforce);
         
-   
+    HDint nCurrentButtons;
+    hdGetIntegerv(HD_CURRENT_BUTTONS, &nCurrentButtons);
+
+    button = nCurrentButtons;
 
 
     //handles the sequence of choosing points on a plane
@@ -319,6 +327,8 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             }
             else if (sequence == 1) {
                 point2 = posLV;
+                
+                //if statement here
                 sequence++;
             }
             else {
@@ -388,7 +398,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 __declspec(dllexport) int start()
 {
     HDErrorInfo error;
-
+    doonce = false;
     sequence = 0;
 
     // Initialize the default haptic device.
@@ -481,7 +491,7 @@ __declspec(dllexport) double getpsi() {
 }
 
 //Parameters from LabView
-__declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback) {
+__declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback, double foprc) {
     height = ypos;
     imgsizex = sizeofimgx;
     imgsizez = sizeofimgz;
@@ -509,8 +519,9 @@ __declspec(dllexport) int clicks(bool reset) {
     return seq;
 }
 
+
 //Imports position data from LabView (to allow flipping of data)
-__declspec(dllexport) void datain(double xin, double output, double zin) {
+__declspec(dllexport) void datain(double xin, double output, double zin, double planeh) {
     dataoutlast = dataoutcurrent;
     dataoutcurrent = output;
     xinlast = xincurrent;
@@ -518,6 +529,7 @@ __declspec(dllexport) void datain(double xin, double output, double zin) {
     zinlast = zincurrent;
     zincurrent = zin;
     posLV = { xinlast, dataoutlast, zinlast };
+    planeheight = planeh;
 }
 
 //maps data (probably could replace in HDCALLBACK to make more efficient)
@@ -582,16 +594,26 @@ __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double
     maxcurrent = maxcurrentin;
 }
 
-__declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
+__declspec(dllexport) double yrescale(double ylabview, double scalingfactor, double shiftz) {
     double youtput;
     double logscale = -1 * scalingfactor;
     ylabviewlast = ylabviewcurrent;
     ylabviewcurrent = ylabview;
+    shift = shiftz;
 
     if (current >= percent * setpointcurrent && lastcurrent < percent * setpointcurrent) {
         Zthresh = ylabviewlast;
     }
     
+    //if (ylabview >= Zthresh) {
+    //    youtput = ylabview;
+    //}
+    //else {
+    //    //Log Scaling:
+    //    //youtput = 1 / logscale * std::log(logscale * (ylabview - Zthresh) + 1) + Zthresh; 
+    //    //Linear scaling:
+    //    youtput = 0.1 * (ylabview - Zthresh) + Zthresh;
+    //}
 
     if (current <= percent * setpointcurrent) {
         youtput = ylabview;
@@ -601,9 +623,28 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
         //youtput = 1 / logscale * std::log(logscale * (ylabview - Zthresh) + 1) + Zthresh; 
         //Linear scaling:
         youtput = 0.1 * (ylabview - Zthresh) + Zthresh;
+        if (youtput < ylabview) {
+            youtput = ylabview;
+        }
     }
+    
+    /*if (ylabview >= planeheight + shift) {
+        youtput = ylabview;
+    }
+    else {
+        youtput = 0.1 * (ylabview - (planeheight + shift)) + (planeheight + shift);
+    }*/
+    if (youtput > 10000) {
+        return ylabview;
+    }
+    else {
+        return youtput;
+    }
+    
+}
 
-    return youtput;
+__declspec(dllexport) int buttonstate() {
+    return button;
 }
 
 __declspec(dllexport) double zlimit(double yscaledinput) {
