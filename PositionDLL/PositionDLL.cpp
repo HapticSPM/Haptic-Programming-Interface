@@ -27,17 +27,25 @@
 #include <iostream>
 #include <Windows.h>
 #include <vector>
+#include <windows.h>
+
+
 
 //This is a dumb way to use fractions when declaring variables.
 double frac(double xin, double yin) {
     return xin / yin;
 }
 
+
+
 //height of the plane from LabView
 double height = 20;
 
 double xorigin = 0;
 double zorigin = 0;
+
+
+
 
 //initial height of plane
 double h = 20;
@@ -64,6 +72,12 @@ double forcex = 0;
 double forcey = 0;
 double forcez = 0;
 
+//force scaling for current input
+double maxforce = 2.485;
+double minforce = 0.275;
+double setpointcurrent = 0;
+double maxcurrent = 10;
+
 //the positions mapped to the initial 159x159 canvas
 double xmap0;
 double zmap0;
@@ -74,13 +88,36 @@ int count = 0;
 int sequence = 0;
 int frames = 0;
 int wait;
+bool feedbackmode = 1;
 
 const int lastframes = 100;
 std::vector<hduVector3Dd> lastvel(lastframes);
 bool testvar = false;
 hduVector3Dd avgvel;
 //ouput value from LabView data
-double dataout = 0;
+double dataoutcurrent = 0;
+double dataoutlast;
+double current = 0;
+double lastcurrent = 0;
+double Zthresh = 0;
+double Zmax = 0;
+
+double percent = 0.75;
+double forcetrigger;
+
+double yscaledcurrent;
+double yscaledlast;
+
+double xincurrent;
+double xinlast;
+double zincurrent;
+double zinlast;
+
+double forceynodragcurrent;
+double forceynodraglast;
+
+double ylabviewlast;
+double ylabviewcurrent;
 
 
 //input position from LabView (to make flipping data easier)
@@ -96,21 +133,38 @@ hduVector3Dd vel = { 0,0,0 };
 void plane() {
     hduVector3Dd a = point2 - point1;
     hduVector3Dd b = point3 - point1;
-    n = a.crossProduct(b);
+    n = -1 * a.crossProduct(b);
+    if (n[1] < 0) {
+        n = -1 * n;
+    }
+}
+
+double force(double c) {
+    return 1.2 * std::log(c / (setpointcurrent - 40));
+}
+
+__declspec(dllexport) void pause() {
+    Sleep(10000);
 }
 
 //Haptic plane callback.
 HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 {
     hdEnable(HD_MAX_FORCE_CLAMPING);
+    
+    //Logs the current and last forces
+    hduVector3Dd lastforce;
+    hdGetDoublev(HD_LAST_FORCE, lastforce);
+    hduVector3Dd currentforce;
+    hdGetDoublev(HD_CURRENT_FORCE, currentforce);
 
     // Stiffness, i.e. k value, of the plane.  Higher stiffness results
     // in a harder surface.
     const double planeStiffness = 0.35;
     const double wallStiffness = 0.35;
     
-    //Amount of force to trigger choosing point
-    int forcetrigger = 2;
+    //Amount of force to trigger choosing point (def val 2)
+    forcetrigger = force(setpointcurrent);
 
 
     hdBeginFrame(hdGetCurrentDevice());
@@ -146,8 +200,6 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     else {
         zmap0 = scalez * (zzero - position[2]);
     }
-
-   
 
     //these if statements calculate the forces for the bounding box
     //x:
@@ -188,20 +240,58 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         forcez = -2 * coeffz * velocity[2];
     }   
 
-    //Calculates y force depending on the input height from LabView (or the default value)
-    if (position[1] <= h )
-    {
-        double penetrationDistance = fabs(position[1] - h);
-        // Hooke's law explicitly:
-        double k = planeStiffness;
-        double x = penetrationDistance;
-        forcey = k * x;
-       
+    double c = 0.6;
+    
+    if (feedbackmode == 1) {
+        //Calculates y force depending on the input height from LabView (or the default value)
+        if (position[1] <= h)
+        {
+            double penetrationDistance = fabs(position[1] - h);
+            // Hooke's law explicitly:
+            double k = planeStiffness;
+            double x = penetrationDistance;
+            forcey = k * x;
+
+        }
+        else {
+            forcey = 0;
+        }
     }
     else {
-        forcey = 0;
+        double mincurrent = 0; //sets min current to 1 pA
+        /*if (current > setpointcurrent - 40) {
+            forcey = 1.0 * std::log(current / (setpointcurrent - 40)); 
+        }
+        else if (current < mincurrent) {
+            forcey = 0;
+        }*/
+        
+
+        if (current > c * setpointcurrent) {
+            forcey = std::log(current / (0.5 * setpointcurrent));
+        }
+        else if (current < mincurrent) {
+            forcey = 0;
+        }
+        else {
+            forcey = std::log(c / 0.5) / (c * setpointcurrent) * current;
+        }
+
+        if (forcey > maxforce) {
+            forcey = maxforce;
+        }
+        else if (forcey < 0) {
+            forcey = 0;
+        }
     }
-    
+
+    forceynodraglast = forceynodragcurrent;
+    forceynodragcurrent = forcey;
+
+    if (current <= setpointcurrent) {
+        forcey = -2 * coeffz * velocity[1] + forcey;
+    }
+
     
     //Sets wait time between choosing points, 1st takes longer
     if (sequence == 0) {
@@ -215,17 +305,13 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     hduVector3Dd finalforce = { forcex, forcey, forcez };
     hdSetDoublev(HD_CURRENT_FORCE, finalforce);
         
-    //Logs the current and last forces
-    hduVector3Dd lastforce;
-    hdGetDoublev(HD_LAST_FORCE, lastforce);
-    hduVector3Dd currentforce;
-    hdGetDoublev(HD_CURRENT_FORCE, currentforce);
+   
 
 
     //handles the sequence of choosing points on a plane
     if (sequence <= 2 && frames == wait) {
         h = height;
-        if ((currentforce[1] <= forcetrigger) && (lastforce[1] >= forcetrigger)) {
+        if ((forceynodragcurrent <= forcetrigger) && (forceynodraglast >= forcetrigger)) {
             frames = 0;
             if (sequence == 0) {
                 point1 = posLV;
@@ -395,7 +481,7 @@ __declspec(dllexport) double getpsi() {
 }
 
 //Parameters from LabView
-__declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc) {
+__declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback) {
     height = ypos;
     imgsizex = sizeofimgx;
     imgsizez = sizeofimgz;
@@ -405,7 +491,7 @@ __declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeo
     scalez = frac(imgsizez, 120);
     coeffx = dragc;
     coeffz = coeffx;
-    
+    feedbackmode = feedback;
 }
 
 __declspec(dllexport) void origin(double xorg, double zorg) {
@@ -414,7 +500,10 @@ __declspec(dllexport) void origin(double xorg, double zorg) {
 }
 
 //counts the number of clicks
-__declspec(dllexport) int clicks() {
+__declspec(dllexport) int clicks(bool reset) {
+    if (reset) {
+        sequence = 0;
+    }
     double seq;
     seq = sequence;
     return seq;
@@ -422,8 +511,13 @@ __declspec(dllexport) int clicks() {
 
 //Imports position data from LabView (to allow flipping of data)
 __declspec(dllexport) void datain(double xin, double output, double zin) {
-    dataout = output;
-    posLV = { xin, output, zin };
+    dataoutlast = dataoutcurrent;
+    dataoutcurrent = output;
+    xinlast = xincurrent;
+    xincurrent = xin;
+    zinlast = zincurrent;
+    zincurrent = zin;
+    posLV = { xinlast, dataoutlast, zinlast };
 }
 
 //maps data (probably could replace in HDCALLBACK to make more efficient)
@@ -479,8 +573,51 @@ __declspec(dllexport) double vely() {
 __declspec(dllexport) double velz() {
     return avgvel[2] * scalez * frac(sizeofboxz, imgsizez);
 }
+__declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin) {
+    lastcurrent = fabs(current);
+    current = fabs(currentin);
+    maxforce = maxforcey;
+    minforce = minforcey;
+    setpointcurrent = fabs(setpoint);
+    maxcurrent = maxcurrentin;
+}
 
+__declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
+    double youtput;
+    double logscale = -1 * scalingfactor;
+    ylabviewlast = ylabviewcurrent;
+    ylabviewcurrent = ylabview;
 
+    if (current >= percent * setpointcurrent && lastcurrent < percent * setpointcurrent) {
+        Zthresh = ylabviewlast;
+    }
+    
+
+    if (current <= percent * setpointcurrent) {
+        youtput = ylabview;
+    }
+    else {
+        //Log Scaling:
+        //youtput = 1 / logscale * std::log(logscale * (ylabview - Zthresh) + 1) + Zthresh; 
+        //Linear scaling:
+        youtput = 0.1 * (ylabview - Zthresh) + Zthresh;
+    }
+
+    return youtput;
+}
+
+__declspec(dllexport) double zlimit(double yscaledinput) {
+    yscaledlast = yscaledcurrent;
+    yscaledcurrent = yscaledinput;
+    
+    if (current >= maxcurrent && lastcurrent < maxcurrent) {
+        Zmax = yscaledlast;
+    }
+    /*if (current >= maxcurrent) {
+        Zmax = Zmax + 0.01;
+    }*/
+    return Zmax;
+}
 //Shuts down device
 __declspec(dllexport) void shutdown() {
     sequence = 0;

@@ -12,7 +12,7 @@
 #endif
 
 
-extern "C" POSITION_API void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc);
+extern "C" POSITION_API void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback);
 
 extern "C" POSITION_API int start();
 
@@ -36,7 +36,7 @@ extern "C" POSITION_API double getphi();
 
 extern "C" POSITION_API double getpsi();
 
-extern "C" POSITION_API int clicks();
+extern "C" POSITION_API int clicks(bool reset);
 
 extern "C" POSITION_API void datain(double xin, double output, double zin);
 
@@ -55,3 +55,11 @@ extern "C" POSITION_API double velx();
 extern "C" POSITION_API double vely();
 
 extern "C" POSITION_API double velz();
+
+extern "C" POSITION_API void pause();
+
+extern "C" POSITION_API void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin);
+
+extern "C" POSITION_API double yrescale(double ylabview, double scalingfactor);
+
+extern "C" POSITION_API double zlimit(double yscaledinput);
