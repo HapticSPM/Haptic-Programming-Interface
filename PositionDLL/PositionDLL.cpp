@@ -177,7 +177,7 @@ double spc_percent = 0.75;
 
 
 /*** HAPTIC CALLBACK ***/
-//This is where the main code is run and the forces are written. Most code is in this loop
+//This is where the main code is run and the forces are written. Most code is in this loop.
 HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 {
     hdEnable(HD_MAX_FORCE_CLAMPING);
@@ -188,15 +188,14 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     hduVector3Dd currentforce;
     hdGetDoublev(HD_CURRENT_FORCE, currentforce);
 
-    // Stiffness, i.e. k value, of the plane.  Higher stiffness results
+    // Stiffness, i.e. k value, of the plane and walls.  Higher stiffness results
     // in a harder surface.
     const double planeStiffness = 0.35;
     const double wallStiffness = 0.35;
-    
-    //Amount of force to trigger choosing point (def val 2)
+
     forcetrigger = force(current_setpoint);
 
-
+    
     hdBeginFrame(hdGetCurrentDevice());
     
     // Get the position of the device.
@@ -206,7 +205,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     // Get the velocity of the device.
     hdGetDoublev(HD_CURRENT_VELOCITY, velocity);
 
-    //These if statements map the raw position of the arm to a imgsize x imgsize canvas.
+    //These map the raw position of the arm to the nanonis frame.
     //Both are bounded by [0, imgsize].
     if (scale_x * (position[0] - x0_haptic) >= fw_nano) {
         x_nano = fw_nano;
@@ -370,7 +369,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         frames++;
     }
 
-    
+    // Finds the average velocity, could be used if the drag forces get out of control. As of now, they aren't used anywhere.
     if (num_clicks == 3) {
         lastvel[frames] = velocity;
     }
@@ -540,7 +539,7 @@ __declspec(dllexport) int clicks(bool reset) {
     if (reset) {
         num_clicks = 0;
     }
-    double seq;
+    int seq;
     seq = num_clicks;
     return seq;
 }

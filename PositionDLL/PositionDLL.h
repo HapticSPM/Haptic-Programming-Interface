@@ -12,54 +12,54 @@
 #endif
 
 
-extern "C" POSITION_API void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback);
+extern "C" __declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback);
 
-extern "C" POSITION_API int start();
+extern "C" __declspec(dllexport) int start();
 
-extern "C" POSITION_API double getposx();
+extern "C" __declspec(dllexport) double getposx();
 
-extern "C" POSITION_API double getposy();
+extern "C" __declspec(dllexport) double getposy();
 
-extern "C" POSITION_API double getposz();
+extern "C" __declspec(dllexport) double getposz();
 
-extern "C" POSITION_API void shutdown();
+extern "C" __declspec(dllexport) void shutdown();
 
-extern "C" POSITION_API double getforcex();
+extern "C" __declspec(dllexport) double getforcex();
 
-extern "C" POSITION_API double getforcey();
+extern "C" __declspec(dllexport) double getforcey();
 
-extern "C" POSITION_API double getforcez();
+extern "C" __declspec(dllexport) double getforcez();
 
-extern "C" POSITION_API double gettheta();
+extern "C" __declspec(dllexport) double gettheta();
 
-extern "C" POSITION_API double getphi();
+extern "C" __declspec(dllexport) double getphi();
 
-extern "C" POSITION_API double getpsi();
+extern "C" __declspec(dllexport) double getpsi();
 
-extern "C" POSITION_API int clicks(bool reset);
+extern "C" __declspec(dllexport) int clicks(bool reset);
 
-extern "C" POSITION_API void datain(double output);
+extern "C" __declspec(dllexport) void datain(double output);
 
-extern "C" POSITION_API double pd();
+extern "C" __declspec(dllexport) double pd();
 
-extern "C" POSITION_API double pnx();
+extern "C" __declspec(dllexport) double pnx();
 
-extern "C" POSITION_API double pny();
+extern "C" __declspec(dllexport) double pny();
 
-extern "C" POSITION_API double pnz();
+extern "C" __declspec(dllexport) double pnz();
 
-extern "C" POSITION_API void origin(double xorg, double zorg);
+extern "C" __declspec(dllexport) void origin(double xorg, double zorg);
 
-extern "C" POSITION_API double velx();
+extern "C" __declspec(dllexport) double velx();
 
-extern "C" POSITION_API double vely();
+extern "C" __declspec(dllexport) double vely();
 
-extern "C" POSITION_API double velz();
+extern "C" __declspec(dllexport) double velz();
 
-extern "C" POSITION_API int buttonstate();
+extern "C" __declspec(dllexport) int buttonstate();
 
-extern "C" POSITION_API void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin);
+extern "C" __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin);
 
-extern "C" POSITION_API double yrescale(double ylabview, double scalingfactor);
+extern "C" __declspec(dllexport) double yrescale(double ylabview, double scalingfactor);
 
-extern "C" POSITION_API double zlimit(double yscaledinput);
+extern "C" __declspec(dllexport) double zlimit(double yscaledinput);
