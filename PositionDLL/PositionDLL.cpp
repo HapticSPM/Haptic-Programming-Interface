@@ -154,7 +154,7 @@ double yscaled_last;
 
 
 /*** BUTTON ***/
-int buttonstate;
+int button_state;
 
 
 /*** POSITIONS ***/
@@ -335,7 +335,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     HDint nCurrentButtons;
     hdGetIntegerv(HD_CURRENT_BUTTONS, &nCurrentButtons);
 
-    buttonstate = nCurrentButtons;
+    button_state = nCurrentButtons;
 
 
     //handles the sequence of choosing points on a plane
@@ -656,8 +656,8 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
     
 }
 
-__declspec(dllexport) int button() {
-    return buttonstate;
+__declspec(dllexport) int buttonstate() {
+    return button_state;
 }
 
 __declspec(dllexport) double zlimit(double yscaledinput) {

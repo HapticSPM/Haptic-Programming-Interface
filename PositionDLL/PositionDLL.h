@@ -46,7 +46,7 @@ extern "C" __declspec(dllexport) double vely();
 
 extern "C" __declspec(dllexport) double velz();
 
-extern "C" __declspec(dllexport) int button();
+extern "C" __declspec(dllexport) int buttonstate();
 
 extern "C" __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin);
 
