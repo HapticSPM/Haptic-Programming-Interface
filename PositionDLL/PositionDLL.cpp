@@ -102,7 +102,21 @@ int num_clicks = 0;
 int frames = 0;
 //Wait after each click
 int wait;
-
+//Normal vector & points for plane
+hduVector3Dd normal;
+hduVector3Dd point1, point2, point3;
+//This calculates plane attributes
+void plane() {
+    hduVector3Dd a = point2 - point1;
+    hduVector3Dd b = point3 - point1;
+    normal = -1 * a.crossProduct(b);
+    if (normal[1] < 0) {
+        normal = -1 * normal;
+    }
+}
+//Ouput value from LabView data, this is the y value used for planing
+double planingdata_current = 0;
+double planingdata_last;
 
 /*** VELOCITY ***/
 hduVector3Dd velocity;
@@ -116,23 +130,8 @@ std::vector<hduVector3Dd> lastvel(lastframes);
 //PROBLEM: no idea what this does
 bool testvar = false;
 hduVector3Dd avgvel;
-//Normal vector & points for plane
-hduVector3Dd normal;
-hduVector3Dd point1, point2, point3;
-//This calculates plane attributes
-void plane() {
-    hduVector3Dd a = point2 - point1;
-    hduVector3Dd b = point3 - point1;
-    normal = -1 * a.crossProduct(b);
-    if (normal[1] < 0) {
-        normal = -1 * normal;
-    }
-}
 
 
-//ouput value from LabView data
-double dataoutcurrent = 0;
-double dataoutlast;
 double current = 0;
 double lastcurrent = 0;
 double Zthresh = 0;
@@ -154,9 +153,6 @@ double forceynodraglast;
 double ylabviewlast = 0;
 double ylabviewcurrent = 0;
 
-double planeheight;
-
-double shift = -0.5;
 
 
 //input position from LabView (to make flipping data easier)
@@ -538,15 +534,14 @@ __declspec(dllexport) int clicks(bool reset) {
 
 
 //Imports position data from LabView (to allow flipping of data)
-__declspec(dllexport) void datain(double xin, double output, double zin, double planeh) {
-    dataoutlast = dataoutcurrent;
-    dataoutcurrent = output;
+__declspec(dllexport) void datain(double xin, double output, double zin) {
+    planingdata_last = planingdata_current;
+    planingdata_current = output;
     xinlast = xincurrent;
     xincurrent = xin;
     zinlast = zincurrent;
     zincurrent = zin;
-    posLV = { xinlast, dataoutlast, zinlast };
-    planeheight = planeh;
+    posLV = { xinlast, planingdata_last, zinlast };
 }
 
 //maps data (probably could replace in HDCALLBACK to make more efficient)
@@ -611,12 +606,11 @@ __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double
     current_max = maxcurrentin;
 }
 
-__declspec(dllexport) double yrescale(double ylabview, double scalingfactor, double shiftz) {
+__declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
     double youtput;
     double logscale = -1 * scalingfactor;
     ylabviewlast = ylabviewcurrent;
     ylabviewcurrent = ylabview;
-    shift = shiftz;
 
     if (current >= percent * current_setpoint && lastcurrent < percent * current_setpoint) {
         Zthresh = ylabviewlast;
@@ -645,12 +639,6 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor, dou
         }
     }
     
-    /*if (ylabview >= planeheight + shift) {
-        youtput = ylabview;
-    }
-    else {
-        youtput = 0.1 * (ylabview - (planeheight + shift)) + (planeheight + shift);
-    }*/
     if (youtput > 10000) {
         return ylabview;
     }
