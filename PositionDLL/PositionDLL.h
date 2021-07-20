@@ -38,7 +38,7 @@ extern "C" POSITION_API double getpsi();
 
 extern "C" POSITION_API int clicks(bool reset);
 
-extern "C" POSITION_API void datain(double xin, double output, double zin);
+extern "C" POSITION_API void datain(double output);
 
 extern "C" POSITION_API double pd();
 
@@ -55,8 +55,6 @@ extern "C" POSITION_API double velx();
 extern "C" POSITION_API double vely();
 
 extern "C" POSITION_API double velz();
-
-extern "C" POSITION_API void pause();
 
 extern "C" POSITION_API int buttonstate();
 
