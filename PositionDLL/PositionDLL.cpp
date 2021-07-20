@@ -154,7 +154,7 @@ double yscaled_last;
 
 
 /*** BUTTON ***/
-double button;
+int buttonstate;
 
 
 /*** POSITIONS ***/
@@ -335,7 +335,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     HDint nCurrentButtons;
     hdGetIntegerv(HD_CURRENT_BUTTONS, &nCurrentButtons);
 
-    button = nCurrentButtons;
+    buttonstate = nCurrentButtons;
 
 
     //handles the sequence of choosing points on a plane
@@ -595,15 +595,15 @@ __declspec(dllexport) double pnz() {
 }
 
 __declspec(dllexport) double velx() {
-    return avgvel[0] * scale_x * frac(fw_zoom, fw_nano);
+    return velocity[0] * scale_x * frac(fw_zoom, fw_nano);
 }
 
 __declspec(dllexport) double vely() {
-    return avgvel[1];
+    return velocity[1];
 }
 
 __declspec(dllexport) double velz() {
-    return avgvel[2] * scale_z * frac(fh_zoom, fh_nano);
+    return velocity[2] * scale_z * frac(fh_zoom, fh_nano);
 }
 __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin) {
     current_last = fabs(current_current);
@@ -656,8 +656,8 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
     
 }
 
-__declspec(dllexport) int buttonstate() {
-    return button;
+__declspec(dllexport) int button() {
+    return buttonstate;
 }
 
 __declspec(dllexport) double zlimit(double yscaledinput) {

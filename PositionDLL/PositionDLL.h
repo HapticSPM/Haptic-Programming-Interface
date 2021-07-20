@@ -1,16 +1,6 @@
 #pragma once
 //Position.h - Contains declarations of functions that provide position data
 #pragma once
-#include "string"
-#include "vector"
-
-
-#ifdef POSITION_EXPORTS
-#define POSITION_API __declspec(dllexport)
-#else
-#define POSITION_API __declspec(dllimport)
-#endif
-
 
 extern "C" __declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback);
 
@@ -56,7 +46,7 @@ extern "C" __declspec(dllexport) double vely();
 
 extern "C" __declspec(dllexport) double velz();
 
-extern "C" __declspec(dllexport) int buttonstate();
+extern "C" __declspec(dllexport) int button();
 
 extern "C" __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin);
 
