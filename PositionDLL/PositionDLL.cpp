@@ -75,6 +75,16 @@ double h_nano = 20;
 bool feedbackmode = 1;
 
 
+/*** CURRENT ***/
+//Setpoint Current, set in nanonis, roughly determines the current (pA) at which the force is neutral.
+double current_setpoint = 100;
+//Maximum current is maximum allowed current (pA) before the safety mechanisms kick in
+double current_max = 10000;
+//Live input current
+double current_current = 0;
+double current_last = 0;
+
+
 /*** FORCE PARAMETERS ***/
 //Sets the drag coefficients.
 double dragc_x = 0.001;
@@ -95,16 +105,6 @@ double force_y_nodrag_last;
 double force(double c) {
     return 1.2 * std::log(c / (current_setpoint - 40));
 }
-
-
-/*** CURRENT ***/
-//Setpoint Current, set in nanonis, roughly determines the current (pA) at which the force is neutral.
-double current_setpoint = 100;
-//Maximum current is maximum allowed current (pA) before the safety mechanisms kick in
-double current_max = 10000;
-//Live input current
-double current_current = 0;
-double current_last = 0;
 
 
 /*** PLANING SEQUENCE ***/
