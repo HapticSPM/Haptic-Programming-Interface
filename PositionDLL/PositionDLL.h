@@ -53,3 +53,5 @@ extern "C" __declspec(dllexport) void getcurrent(double currentin, double maxfor
 extern "C" __declspec(dllexport) double yrescale(double ylabview, double scalingfactor);
 
 extern "C" __declspec(dllexport) double zlimit(double yscaledinput);
+
+extern "C" __declspec(dllexport) double zslower(double nanonis_zpos_read, double labview_zpos_write, double maxvel);

@@ -40,7 +40,6 @@ const double z0_haptic = 80;
 const double fw_haptic = 120;
 const double fh_haptic = 120;
 
-
 /*** NANONIS FRAME PROPERTIES ***/
 //Frame origin, the very center of the frame set in scan mode of Nanonis.
 double x0_nano = 0;
@@ -83,6 +82,8 @@ double current_max = 10000;
 //Live input current
 double current_current = 0;
 double current_last = 0;
+//The percent of the setpointcurrent which triggers Zthresh
+double spc_percent = 0.75;
 
 
 /*** FORCE PARAMETERS ***/
@@ -129,7 +130,7 @@ void plane() {
 }
 //Ouput value from LabView data, this is the y value used for planing
 double planingdata_current = 0;
-double planingdata_last;
+double planingdata_last = 0;
 
 
 /*** VELOCITY ***/
@@ -159,10 +160,10 @@ int button_state;
 
 /*** POSITIONS ***/
 //Final positions being sent to Labview
-double xf_current;
-double xf_last;
-double zf_current;
-double zf_last;
+double xf_current = 0;
+double xf_last = 0;
+double zf_current = 0;
+double zf_last = 0;
 //input position from LabView (to make flipping data easier)
 hduVector3Dd posLV;
 //input y position from LabView BEFORE the scaling function has been applied (raw y from labview in units of nm, doesn't slow down at Zthresh)
@@ -172,8 +173,6 @@ double ylabview_current = 0;
 double Zthresh = 0;
 //The maximum Z at which the current has exceeded the maximum current
 double Zmax = 0;
-//The percent of the setpointcurrent which triggers Zthresh
-double spc_percent = 0.75;
 
 
 /*** HAPTIC CALLBACK ***/
@@ -668,6 +667,22 @@ __declspec(dllexport) double zlimit(double yscaledinput) {
         Zmax = yscaled_last;
     }
     return Zmax;
+}
+
+__declspec(dllexport) double zslower(double nanonis_zpos_read, double labview_zpos_write, double maxvel) {
+    maxvel = maxvel * 0.001; //nm per millisecond to nm to second
+    double newzpos;
+    if (labview_zpos_write - nanonis_zpos_read >= maxvel) {
+        newzpos = nanonis_zpos_read + maxvel;
+    }
+    else if (nanonis_zpos_read - labview_zpos_write >= maxvel)
+    {
+        newzpos = nanonis_zpos_read - maxvel;
+    }
+    else {
+        newzpos = labview_zpos_write;
+    }
+    return newzpos;
 }
 
 //Shuts down device
