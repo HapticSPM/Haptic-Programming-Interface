@@ -265,7 +265,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         force_z = -2 * dragc_z * velocity[2];
     }   
 
-    double c = 0.6;
+    double c = spc_percent;
     
     if (feedbackmode == 1) {
         //Calculates y force depending on the input height from LabView (or the default value)
@@ -638,7 +638,7 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
     }
     else {
         //Log Scaling:
-        //youtput = 1 / logscale * std::log(logscale * (ylabview - Zthresh) + 1) + Zthresh; 
+        //youtput = 1 / lmaogscale * std::log(logscale * (ylabview - Zthresh) + 1) + Zthresh; 
         //Linear scaling:
         youtput = 0.1 * (ylabview - Zthresh) + Zthresh;
         if (youtput < ylabview) {
