@@ -103,6 +103,7 @@ double forcetrigger;
 double force_y_nodrag_current;
 double force_y_nodrag_last;
 //determines force scaling
+int forcesetting = 0;
 double force(double c) {
     return 1.2 * std::log(c / (current_setpoint - 40));
 }
@@ -264,8 +265,6 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     else {
         force_z = -2 * dragc_z * velocity[2];
     }   
-
-    double c = spc_percent;
     
     if (feedbackmode == 1) {
         //Calculates y force depending on the input height from LabView (or the default value)
@@ -283,25 +282,49 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         }
     }
     else {
-        double mincurrent = 0; //sets min current to 1 pA
-        /*if (current > setpointcurrent - 40) {
-            forcey = 1.0 * std::log(current / (setpointcurrent - 40)); 
-        }
-        else if (current < mincurrent) {
-            forcey = 0;
-        }*/
+        double mincurrent = 0;
+        double k2 = 0.1;
         
-        //forcey = std::log(current / (0.5 * setpointcurrent) + 1);
-        if (current_current > c * current_setpoint) {
-            force_y = std::log(current_current / (0.25 * current_setpoint));
+        switch (forcesetting) {
+            case 0: //Stacked Logs
+                if (current_current > spc_percent * current_setpoint) {
+                    force_y = std::log(current_current / (0.25 * current_setpoint));
+                }
+                else if (current_current < mincurrent) {
+                    force_y = 0;
+                }
+                else {
+                    force_y = (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
+                }
+                break;
+            case 1: //Simple Log Scale
+                if (current_current > current_setpoint) {
+                    force_y = std::log(current_current / current_setpoint);
+                }
+                else if (current_current <= current_setpoint) {
+                    force_y = 0;
+                }
+                break;
+            case 2: //Linear Scale
+                if (current_current > spc_percent * current_setpoint) {
+                    force_y = (k2 / (spc_percent * current_setpoint)) * (current_current - spc_percent * current_setpoint);
+                }
+                else if (current_current <= spc_percent * current_setpoint) {
+                    force_y = 0;
+                }
+                break;
+            default:
+                if (current_current > spc_percent * current_setpoint) {
+                    force_y = std::log(current_current / (0.25 * current_setpoint));
+                }
+                else if (current_current < mincurrent) {
+                    force_y = 0;
+                }
+                else {
+                    force_y = (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
+                }
         }
-        else if (current_current < mincurrent) {
-            force_y = 0;
-        }
-        else {
-            force_y = (std::log(4 * c) / std::log(c * current_setpoint + 1)) * std::log(current_current + 1);
-            //forcey = std::log(c / 0.5) / (c * setpointcurrent) * current;
-        }
+        
 
         if (force_y > force_y_max) {
             force_y = force_y_max;
@@ -604,13 +627,14 @@ __declspec(dllexport) double vely() {
 __declspec(dllexport) double velz() {
     return velocity[2] * scale_z * frac(fh_zoom, fh_nano);
 }
-__declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin) {
+__declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin, int forcemode) {
     current_last = fabs(current_current);
     current_current = fabs(currentin);
     force_y_max = maxforcey;
     force_y_min = minforcey;
     current_setpoint = fabs(setpoint);
     current_max = maxcurrentin;
+    forcesetting = forcemode;
 }
 
 __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
@@ -619,9 +643,28 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
     ylabview_last = ylabview_current;
     ylabview_current = ylabview;
 
-    if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-        Zthresh = ylabview_last;
+    switch (forcesetting) {
+        case 0:
+            if (current_current >= current_setpoint && current_last < current_setpoint) {
+                Zthresh = ylabview_last;
+            }
+            break;
+        case 1:
+            if (current_current >= current_setpoint && current_last < current_setpoint) {
+                Zthresh = ylabview_last;
+            }
+            break;
+        case 2:
+            if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
+                Zthresh = ylabview_last;
+            }
+            break;
+        default:
+            if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
+                Zthresh = ylabview_last;
+            }
     }
+    
     
     //if (ylabview >= Zthresh) {
     //    youtput = ylabview;

@@ -48,7 +48,7 @@ extern "C" __declspec(dllexport) double velz();
 
 extern "C" __declspec(dllexport) int buttonstate();
 
-extern "C" __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin);
+extern "C" __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin, int forcemode);
 
 extern "C" __declspec(dllexport) double yrescale(double ylabview, double scalingfactor);
 
