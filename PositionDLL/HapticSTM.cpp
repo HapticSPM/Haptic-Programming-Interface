@@ -2,7 +2,7 @@
 #include "pch.h" // use stdafx.h in Visual Studio 2017 and earlier
 #include <utility>
 #include <limits.h>
-#include "PositionDLL.h"
+#include "HapticSTM.h"
 
 #ifdef  _WIN64
 #pragma warning (disable:4996)
@@ -53,6 +53,33 @@ double z_nano;
 //Scaling constants for mapping purposes
 double scale_x = frac(fw_nano, fw_haptic);
 double scale_z = frac(fh_nano, fh_haptic);
+//Functions that maps the data
+double mapx(double xunmap) {
+    double xvar;
+    if (scale_x * (xunmap - x0_haptic) >= fw_nano) {
+        xvar = fw_nano;
+    }
+    else if (scale_x * (xunmap - x0_haptic) <= 0) {
+        xvar = 0;
+    }
+    else {
+        xvar = scale_x * (xunmap - x0_haptic);
+    }
+    return xvar;
+}
+double mapz(double zunmap) {
+    double zvar;
+    if (scale_z * (z0_haptic - zunmap) >= fh_nano) {
+        zvar = fh_nano;
+    }
+    else if (scale_z * (z0_haptic - zunmap) <= 0) {
+        zvar = 0;
+    }
+    else {
+        zvar = scale_z * (z0_haptic - zunmap);
+    }
+    return zvar;
+}
 
 
 /*** ZOOM FRAME PROPERTIES ***/
@@ -84,12 +111,14 @@ double current_current = 0;
 double current_last = 0;
 //The percent of the setpointcurrent which triggers Zthresh
 double spc_percent = 0.75;
+//Minimum current it takes to write a force
+double mincurrent = 0;
 
 
 /*** FORCE PARAMETERS ***/
 //Sets the drag coefficients.
 double dragc_x = 0.001;
-double dragc_z = dragc_x;
+double dragc_z = 2 * dragc_x;
 //The force component in each direction.
 double force_x = 0;
 double force_y = 0;
@@ -180,23 +209,21 @@ double Zmax = 0;
 //This is where the main code is run and the forces are written. Most code is in this loop.
 HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 {
-    hdEnable(HD_MAX_FORCE_CLAMPING);
-    
-    //Logs the current and last forces
-    hduVector3Dd lastforce;
-    hdGetDoublev(HD_LAST_FORCE, lastforce);
-    hduVector3Dd currentforce;
-    hdGetDoublev(HD_CURRENT_FORCE, currentforce);
+    hdEnable(HD_MAX_FORCE_CLAMPING); 
 
     // Stiffness, i.e. k value, of the plane and walls.  Higher stiffness results
     // in a harder surface.
     const double planeStiffness = 0.35;
     const double wallStiffness = 0.35;
-
-    forcetrigger = force(current_setpoint);
-
     
     hdBeginFrame(hdGetCurrentDevice());
+
+    //Gets forces
+    hduVector3Dd lastforce;
+    hdGetDoublev(HD_LAST_FORCE, lastforce);
+    hduVector3Dd currentforce;
+    hdGetDoublev(HD_CURRENT_FORCE, currentforce);
+    forcetrigger = force(current_setpoint);
     
     // Get the position of the device.
     hduVector3Dd position;
@@ -207,42 +234,21 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 
     //These map the raw position of the arm to the nanonis frame.
     //Both are bounded by [0, imgsize].
-    if (scale_x * (position[0] - x0_haptic) >= fw_nano) {
-        x_nano = fw_nano;
-    }
-    else if (scale_x * (position[0] - x0_haptic) <= 0) {
-        x_nano = 0;
-    }
-    else {
-        x_nano = scale_x * (position[0] - x0_haptic);
-    }
-
-    if (scale_z * (z0_haptic - position[2]) >= fh_nano) {
-        z_nano = fh_nano;
-    }
-    else if (scale_z * (z0_haptic - position[2]) <= 0) {
-        z_nano = 0;
-    }
-    else {
-        z_nano = scale_z * (z0_haptic - position[2]);
-    }
+    
+    x_nano = mapx(position[0]);
+    z_nano = mapz(position[2]);
 
     //these if statements calculate the forces for the bounding box
     //x:
     if (x_nano == 0)
     {
         double penetrationDistancex = frac(159, fw_nano) * fabs(scale_x * (position[0] - x0_haptic));
-        double kx = wallStiffness;
-        double xx = penetrationDistancex;
-        force_x = kx * xx;
+        force_x = wallStiffness * penetrationDistancex;
     }
     else if (x_nano == fw_nano)
     {
         double penetrationDistancex = frac(159, fw_nano) * fabs(fw_nano - scale_x * (position[0] - x0_haptic));
-        double kx = wallStiffness;
-        double xx = penetrationDistancex;
-        force_x = -1 * kx * xx;
- 
+        force_x = -1 * wallStiffness * penetrationDistancex;
     }
     else {
         force_x = -1 * dragc_x * velocity[0];
@@ -250,20 +256,16 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     //z:
     if (z_nano == 0)
     {
-        double penetrationDistancex = frac(159, fh_nano) * fabs(scale_z * (z0_haptic - position[2]));
-        double kz = wallStiffness;
-        double xz = penetrationDistancex;
-        force_z = -1 * kz * xz;
+        double penetrationDistancez = frac(159, fh_nano) * fabs(scale_z * (z0_haptic - position[2]));
+        force_z = -1 * wallStiffness * penetrationDistancez;
     }
     else if (z_nano == fh_nano)
     {
-        double penetrationDistancex = frac(159, fh_nano) * fabs(fh_nano - scale_z * (z0_haptic - position[2]));
-        double kz = wallStiffness;
-        double xz = penetrationDistancex;
-        force_z = kz * xz;
+        double penetrationDistancez = frac(159, fh_nano) * fabs(fh_nano - scale_z * (z0_haptic - position[2]));
+        force_z = wallStiffness * penetrationDistancez;
     }
     else {
-        force_z = -2 * dragc_z * velocity[2];
+        force_z = -1 * dragc_z * velocity[2];
     }   
     
     if (feedbackmode == 1) {
@@ -271,10 +273,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         if (position[1] <= h_nano)
         {
             double penetrationDistance = fabs(position[1] - h_nano);
-            // Hooke's law explicitly:
-            double k = planeStiffness;
-            double x = penetrationDistance;
-            force_y = k * x;
+            force_y = planeStiffness * penetrationDistance;
 
         }
         else {
@@ -282,7 +281,6 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         }
     }
     else {
-        double mincurrent = 0;
         double k2 = 0.1;
         
         switch (forcesetting) {
@@ -448,9 +446,7 @@ __declspec(dllexport) int start()
     HHD hHD = hdInitDevice(HD_DEFAULT_DEVICE);
     if (HD_DEVICE_ERROR(error = hdGetError()))
     {
-        hduPrintError(stderr, &error, "Failed to initialize haptic device");
-        fprintf(stderr, "\nPress any key to quit.\n");
-        getch();
+        //Failed to initialize haptic device
         return -1;
     }
 
@@ -459,7 +455,7 @@ __declspec(dllexport) int start()
     hdStartScheduler();
     if (HD_DEVICE_ERROR(error = hdGetError()))
     {
-        getch();
+        //Error
         return -1;
     }
 
@@ -473,7 +469,6 @@ __declspec(dllexport) int start()
         return 3;
         if (!hdWaitForCompletion(hPlaneCallback, HD_WAIT_CHECK_STATUS))
         {
-            getch();
             break;
         }
     }
@@ -539,7 +534,7 @@ __declspec(dllexport) double getpsi() {
 }
 
 //Parameters from LabView
-__declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback, double foprc) {
+__declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback) {
     height_i = ypos;
     fw_nano = sizeofimgx;
     fh_nano = sizeofimgz;
@@ -572,34 +567,6 @@ __declspec(dllexport) void datain(double output) {
     planingdata_last = planingdata_current;
     planingdata_current = output;
     posLV = { xf_last, planingdata_last, zf_last };
-}
-
-//maps data (probably could replace in HDCALLBACK to make more efficient)
-double mapx(double xunmap) {
-    double xvar;
-    if (scale_x * (xunmap - x0_haptic) >= fw_nano) {
-        xvar = fw_nano;
-    }
-    else if (scale_x * (xunmap - x0_haptic) <= 0) {
-        xvar = 0;
-    }
-    else {
-        xvar = scale_x * (xunmap - x0_haptic);
-    }
-    return xvar;
-}
-double mapz(double zunmap) {
-    double zvar;
-    if (scale_z * (z0_haptic - zunmap) >= fh_nano) {
-        zvar = fh_nano;
-    }
-    else if (scale_z * (z0_haptic - zunmap) <= 0) {
-        zvar = 0;
-    }
-    else {
-        zvar = scale_z * (z0_haptic - zunmap);
-    }
-    return zvar;
 }
 
 //Exports plane attributes to LabView
