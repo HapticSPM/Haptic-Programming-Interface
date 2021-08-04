@@ -705,4 +705,3 @@ __declspec(dllexport) void shutdown() {
     hdUnschedule(hPlaneCallback);
     hdDisableDevice(hHD); 
 }
-
