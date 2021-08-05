@@ -197,7 +197,7 @@ double zf_last = 0;
 //input position from LabView (to make flipping data easier)
 hduVector3Dd posLV;
 //input y position from LabView BEFORE the scaling function has been applied (raw y from labview in units of nm, doesn't slow down at Zthresh)
-double ylabview_last = 0;
+std::vector<double> ylabview_last(10);
 double ylabview_current = 0;
 //The threshold Z at which the pen position starts scaling (decreasing the distance it travels)
 double Zthresh = 0;
@@ -607,49 +607,38 @@ __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double
 __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
     double youtput;
     double logscale = -1 * scalingfactor;
-    ylabview_last = ylabview_current;
+    for (int i = ylabview_last.size(); i > 1; i--) {
+        ylabview_last[i - 1] = ylabview_last[i - 2];
+    }
+    ylabview_last[0] = ylabview_current;
     ylabview_current = ylabview;
 
     switch (forcesetting) {
         case 0:
             if (current_current >= current_setpoint && current_last < current_setpoint) {
-                Zthresh = ylabview_last;
+                Zthresh = ylabview_last[0];
             }
             break;
         case 1:
             if (current_current >= current_setpoint && current_last < current_setpoint) {
-                Zthresh = ylabview_last;
+                Zthresh = ylabview_last[0];
             }
             break;
         case 2:
             if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-                Zthresh = ylabview_last;
+                Zthresh = ylabview_last[0];
             }
             break;
         default:
             if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-                Zthresh = ylabview_last;
+                Zthresh = ylabview_last[0];
             }
     }
-    
-    
-    //if (ylabview >= Zthresh) {
-    //    youtput = ylabview;
-    //}
-    //else {
-    //    //Log Scaling:
-    //    //youtput = 1 / logscale * std::log(logscale * (ylabview - Zthresh) + 1) + Zthresh; 
-    //    //Linear scaling:
-    //    youtput = 0.1 * (ylabview - Zthresh) + Zthresh;
-    //}
 
     if (current_current <= spc_percent * current_setpoint) {
         youtput = ylabview;
     }
     else {
-        //Log Scaling:
-        //youtput = 1 / lmaogscale * std::log(logscale * (ylabview - Zthresh) + 1) + Zthresh; 
-        //Linear scaling:
         youtput = 0.1 * (ylabview - Zthresh) + Zthresh;
         if (youtput < ylabview) {
             youtput = ylabview;
