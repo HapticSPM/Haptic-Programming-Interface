@@ -110,7 +110,7 @@ double current_max = 10000;
 double current_current = 0;
 double current_last = 0;
 //The percent of the setpointcurrent which triggers Zthresh
-double spc_percent = 0.75;
+double spc_percent = 0.50;
 //Minimum current it takes to write a force
 double mincurrent = 0;
 
@@ -201,6 +201,7 @@ std::vector<double> ylabview_last(10);
 double ylabview_current = 0;
 //The threshold Z at which the pen position starts scaling (decreasing the distance it travels)
 double Zthresh = 0;
+std::string Zthresh_data;
 //The maximum Z at which the current has exceeded the maximum current
 double Zmax = 0;
 
@@ -607,32 +608,38 @@ __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double
 __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
     double youtput;
     double logscale = -1 * scalingfactor;
-    for (int i = ylabview_last.size(); i > 1; i--) {
+    for (long long int i = ylabview_last.size(); i > 1; i--) {
         ylabview_last[i - 1] = ylabview_last[i - 2];
     }
     ylabview_last[0] = ylabview_current;
     ylabview_current = ylabview;
+    std::string vecstr = "Vector: ";
+    for (int i = 0; i < ylabview_last.size(); i++) {
+        vecstr = vecstr + " " + std::to_string(ylabview_last[i]);
+    }
+    Zthresh_data = vecstr;
+
 
     switch (forcesetting) {
-        case 0:
-            if (current_current >= current_setpoint && current_last < current_setpoint) {
-                Zthresh = ylabview_last[0];
-            }
-            break;
-        case 1:
-            if (current_current >= current_setpoint && current_last < current_setpoint) {
-                Zthresh = ylabview_last[0];
-            }
-            break;
-        case 2:
-            if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-                Zthresh = ylabview_last[0];
-            }
-            break;
-        default:
-            if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-                Zthresh = ylabview_last[0];
-            }
+    case 0:
+        if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
+            Zthresh = ylabview_current;
+        }
+        break;
+    case 1:
+        if (current_current >= current_setpoint && current_last < current_setpoint) {
+            Zthresh = ylabview_current;
+        }
+        break;
+    case 2:
+        if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
+            Zthresh = ylabview_current;
+        }
+        break;
+    default:
+        if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
+            Zthresh = ylabview_current;
+        }
     }
 
     if (current_current <= spc_percent * current_setpoint) {
@@ -652,6 +659,10 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
         return youtput;
     }
     
+}
+
+__declspec(dllexport) double threshhold() {
+    return Zthresh;
 }
 
 __declspec(dllexport) int buttonstate() {
