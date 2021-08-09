@@ -60,5 +60,3 @@ extern "C" __declspec(dllexport) double zlimit(double yscaledinput);
 extern "C" __declspec(dllexport) double zslower(double nanonis_zpos_read, double labview_zpos_write, double maxvel);
 
 extern "C" __declspec(dllexport) double yforcetestnodrag();
-
-extern "C" __declspec(dllexport) double yconsttest();
