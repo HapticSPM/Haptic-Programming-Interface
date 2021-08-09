@@ -695,6 +695,58 @@ __declspec(dllexport) double zslower(double nanonis_zpos_read, double labview_zp
     return newzpos;
 }
 
+__declspec(dllexport) double yforcetestnodrag() {
+    double k2 = 0.1;
+    switch (forcesetting) {
+    case 0: //Stacked Logs
+        if (current_current > spc_percent * current_setpoint) {
+            force_y = std::log(current_current / (0.25 * current_setpoint));
+        }
+        else if (current_current < mincurrent) {
+            force_y = 0;
+        }
+        else {
+            force_y = (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
+        }
+        break;
+    case 1: //Simple Log Scale
+        if (current_current > current_setpoint) {
+            force_y = std::log(current_current / current_setpoint);
+        }
+        else if (current_current <= current_setpoint) {
+            force_y = 0;
+        }
+        break;
+    case 2: //Linear Scale
+        if (current_current > spc_percent * current_setpoint) {
+            force_y = (k2 / (spc_percent * current_setpoint)) * (current_current - spc_percent * current_setpoint);
+        }
+        else if (current_current <= spc_percent * current_setpoint) {
+            force_y = 0;
+        }
+        break;
+    default:
+        if (current_current > spc_percent * current_setpoint) {
+            force_y = std::log(current_current / (0.25 * current_setpoint));
+        }
+        else if (current_current < mincurrent) {
+            force_y = 0;
+        }
+        else {
+            force_y = (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
+        }
+    }
+
+
+    if (force_y > force_y_max) {
+        force_y = force_y_max;
+    }
+    else if (force_y < 0) {
+        force_y = 0;
+    }
+    return force_y;
+}
+
 //Shuts down device
 __declspec(dllexport) void shutdown() {
     num_clicks = 0;
