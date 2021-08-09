@@ -206,6 +206,8 @@ std::string Zthresh_data;
 double Zmax = 0;
 
 
+double yk = 1;
+
 /*** HAPTIC CALLBACK ***/
 //This is where the main code is run and the forces are written. Most code is in this loop.
 HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
@@ -283,45 +285,41 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     }
     else {
         double k2 = 0.1;
-        
+        double c3 = 1.2;
         switch (forcesetting) {
-            case 0: //Stacked Logs
-                if (current_current > spc_percent * current_setpoint) {
-                    force_y = std::log(current_current / (0.25 * current_setpoint));
-                }
-                else if (current_current < mincurrent) {
-                    force_y = 0;
-                }
-                else {
-                    force_y = (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
-                }
-                break;
-            case 1: //Simple Log Scale
-                if (current_current > current_setpoint) {
-                    force_y = std::log(current_current / current_setpoint);
-                }
-                else if (current_current <= current_setpoint) {
-                    force_y = 0;
-                }
-                break;
-            case 2: //Linear Scale
-                if (current_current > spc_percent * current_setpoint) {
-                    force_y = (k2 / (spc_percent * current_setpoint)) * (current_current - spc_percent * current_setpoint);
-                }
-                else if (current_current <= spc_percent * current_setpoint) {
-                    force_y = 0;
-                }
-                break;
-            default:
-                if (current_current > spc_percent * current_setpoint) {
-                    force_y = std::log(current_current / (0.25 * current_setpoint));
-                }
-                else if (current_current < mincurrent) {
-                    force_y = 0;
-                }
-                else {
-                    force_y = (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
-                }
+        case 0: //Exponential position scaling
+            force_y = 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
+            break;
+        case 1: //Simple Log Scale
+            if (current_current > current_setpoint) {
+                force_y = std::log(current_current / current_setpoint);
+            }
+            else if (current_current <= current_setpoint) {
+                force_y = 0;
+            }
+            break;
+        case 2: //Linear Scale
+            if (current_current > spc_percent * current_setpoint) {
+                force_y = (k2 / (spc_percent * current_setpoint)) * (current_current - spc_percent * current_setpoint);
+            }
+            else if (current_current <= spc_percent * current_setpoint) {
+                force_y = 0;
+            }
+            break;
+        case 3: //Stacked Logs
+            if (current_current > spc_percent * current_setpoint) {
+                force_y = std::log(current_current / (0.25 * current_setpoint));
+            }
+            else if (current_current < mincurrent) {
+                force_y = 0;
+            }
+            else {
+                force_y = (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
+            }
+
+        default:
+            force_y = 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
+            break;
         }
         
 
@@ -607,50 +605,84 @@ __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double
 
 __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
     double youtput;
+    const double c_yscaling = 0.07;
     double logscale = -1 * scalingfactor;
     for (long long int i = ylabview_last.size(); i > 1; i--) {
         ylabview_last[i - 1] = ylabview_last[i - 2];
     }
     ylabview_last[0] = ylabview_current;
     ylabview_current = ylabview;
-    std::string vecstr = "Vector: ";
-    for (int i = 0; i < ylabview_last.size(); i++) {
-        vecstr = vecstr + " " + std::to_string(ylabview_last[i]);
-    }
-    Zthresh_data = vecstr;
 
 
     switch (forcesetting) {
-    case 0:
+    case 0: //Exponential Scaling
         if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-            Zthresh = ylabview_current;
+            Zthresh = ylabview;
+        }
+        if (current_current <= spc_percent * current_setpoint) {
+            yk = 1;
+            youtput = ylabview;
+        }
+        else {
+            youtput = frac(1, 5) * ( exp( 5 * (ylabview - Zthresh) ) - 1 ) + Zthresh;
         }
         break;
     case 1:
         if (current_current >= current_setpoint && current_last < current_setpoint) {
             Zthresh = ylabview_current;
         }
+        if (current_current <= spc_percent * current_setpoint) {
+            youtput = ylabview;
+        }
+        else {
+            youtput = c_yscaling * (ylabview - Zthresh) + Zthresh;
+            if (youtput < ylabview) {
+                youtput = ylabview;
+            }
+        }
         break;
     case 2:
         if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
             Zthresh = ylabview_current;
         }
+        if (current_current <= spc_percent * current_setpoint) {
+            youtput = ylabview;
+        }
+        else {
+            youtput = c_yscaling * (ylabview - Zthresh) + Zthresh;
+            if (youtput < ylabview) {
+                youtput = ylabview;
+            }
+        }
         break;
-    default:
+    case 3:
         if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
             Zthresh = ylabview_current;
         }
-    }
-
-    if (current_current <= spc_percent * current_setpoint) {
+        if (current_current <= spc_percent * current_setpoint) {
         youtput = ylabview;
-    }
-    else {
-        youtput = 0.1 * (ylabview - Zthresh) + Zthresh;
-        if (youtput < ylabview) {
+        }
+        else {
+            youtput = c_yscaling * (ylabview - Zthresh) + Zthresh;
+            if (youtput < ylabview) {
+                youtput = ylabview;
+            }
+        }
+        break;
+    default:
+        if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
+            Zthresh = ylabview;
+        }
+        if (current_current <= spc_percent * current_setpoint) {
+            yk = 1;
             youtput = ylabview;
         }
+        else {
+            youtput = frac(1, 5) * (exp(5 * (ylabview - Zthresh)) - 1) + Zthresh;
+        }
     }
+
+   
     
     if (youtput > 10000) {
         return ylabview;
@@ -697,17 +729,10 @@ __declspec(dllexport) double zslower(double nanonis_zpos_read, double labview_zp
 
 __declspec(dllexport) double yforcetestnodrag() {
     double k2 = 0.1;
+    double c3 = 1.2;
     switch (forcesetting) {
-    case 0: //Stacked Logs
-        if (current_current > spc_percent * current_setpoint) {
-            force_y = std::log(current_current / (0.25 * current_setpoint));
-        }
-        else if (current_current < mincurrent) {
-            force_y = 0;
-        }
-        else {
-            force_y = (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
-        }
+    case 0: //Exponential position scaling
+        force_y = 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
         break;
     case 1: //Simple Log Scale
         if (current_current > current_setpoint) {
@@ -725,8 +750,8 @@ __declspec(dllexport) double yforcetestnodrag() {
             force_y = 0;
         }
         break;
-    default:
-        if (current_current > spc_percent * current_setpoint) {
+    case 3: //Stacked Logs
+       if (current_current > spc_percent * current_setpoint) {
             force_y = std::log(current_current / (0.25 * current_setpoint));
         }
         else if (current_current < mincurrent) {
@@ -735,6 +760,10 @@ __declspec(dllexport) double yforcetestnodrag() {
         else {
             force_y = (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
         }
+
+    default:
+        force_y = 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
+        break;
     }
 
 
