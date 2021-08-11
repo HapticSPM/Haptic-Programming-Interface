@@ -133,8 +133,10 @@ double force_y_nodrag_current;
 double force_y_nodrag_last;
 //determines force scaling
 int forcesetting = 0;
+double force_fineadjust = 1;
 double force(double c) {
-    return 1.2 * std::log(c / (current_setpoint - 40));
+    double k = force_fineadjust;
+    return k * 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
 }
 
 
@@ -286,9 +288,11 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     else {
         double k2 = 0.1;
         double c3 = 1.2;
+        double kconst = force_fineadjust;
         switch (forcesetting) {
         case 0: //Exponential position scaling
-            force_y = 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
+            
+            force_y = kconst * 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
             break;
         case 1: //Simple Log Scale
             if (current_current > current_setpoint) {
@@ -697,6 +701,10 @@ __declspec(dllexport) double threshhold() {
     return Zthresh;
 }
 
+void forceconfig(double fineadjust) {
+    force_fineadjust = fineadjust;
+}
+
 __declspec(dllexport) int buttonstate() {
     return button_state;
 }
@@ -725,55 +733,6 @@ __declspec(dllexport) double zslower(double nanonis_zpos_read, double labview_zp
         newzpos = labview_zpos_write;
     }
     return newzpos;
-}
-
-__declspec(dllexport) double yforcetestnodrag() {
-    double k2 = 0.1;
-    double c3 = 1.2;
-    switch (forcesetting) {
-    case 0: //Exponential position scaling
-        force_y = 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
-        break;
-    case 1: //Simple Log Scale
-        if (current_current > current_setpoint) {
-            force_y = std::log(current_current / current_setpoint);
-        }
-        else if (current_current <= current_setpoint) {
-            force_y = 0;
-        }
-        break;
-    case 2: //Linear Scale
-        if (current_current > spc_percent * current_setpoint) {
-            force_y = (k2 / (spc_percent * current_setpoint)) * (current_current - spc_percent * current_setpoint);
-        }
-        else if (current_current <= spc_percent * current_setpoint) {
-            force_y = 0;
-        }
-        break;
-    case 3: //Stacked Logs
-       if (current_current > spc_percent * current_setpoint) {
-            force_y = std::log(current_current / (0.25 * current_setpoint));
-        }
-        else if (current_current < mincurrent) {
-            force_y = 0;
-        }
-        else {
-            force_y = (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
-        }
-
-    default:
-        force_y = 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
-        break;
-    }
-
-
-    if (force_y > force_y_max) {
-        force_y = force_y_max;
-    }
-    else if (force_y < 0) {
-        force_y = 0;
-    }
-    return force_y;
 }
 
 //Shuts down device
