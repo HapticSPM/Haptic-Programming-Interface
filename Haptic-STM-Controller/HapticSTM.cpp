@@ -133,6 +133,10 @@ double force_y_nodrag_current;
 double force_y_nodrag_last;
 //determines force scaling
 int forcesetting = 0;
+//Scaling factors
+double k_a = 1;
+double k_b = 1;
+double k_c = 1;
 double force(double c) {
     return 1.2 * std::log(c / (current_setpoint - 40));
 }
@@ -288,14 +292,14 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         double c3 = 1.2;
         switch (forcesetting) {
         case 0: //Exponential position scaling
-            force_y = 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
+            force_y = k_a * 8 * 2.2 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(k_b * frac(1, 100) * current_current + 1);
             break;
         case 1: //Simple Log Scale
-            if (current_current > current_setpoint) {
-                force_y = std::log(current_current / current_setpoint);
-            }
-            else if (current_current <= current_setpoint) {
+            if (current_current <= spc_percent * current_setpoint) {
                 force_y = 0;
+            }
+            else {
+                force_y = k_a * 2.2 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(k_b * (current_current - spc_percent * current_setpoint) + 1);
             }
             break;
         case 2: //Linear Scale
@@ -603,10 +607,15 @@ __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double
     forcesetting = forcemode;
 }
 
+__declspec(dllexport) void forceconfig(double a, double b, double c) {
+    k_a = a;
+    k_b = b;
+    k_c = c;
+}
+
 __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
     double youtput;
     const double c_yscaling = 0.07;
-    double logscale = -1 * scalingfactor;
     for (long long int i = ylabview_last.size(); i > 1; i--) {
         ylabview_last[i - 1] = ylabview_last[i - 2];
     }
@@ -620,25 +629,21 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
             Zthresh = ylabview;
         }
         if (current_current <= spc_percent * current_setpoint) {
-            yk = 1;
             youtput = ylabview;
         }
         else {
-            youtput = frac(1, 5) * ( exp( 5 * (ylabview - Zthresh) ) - 1 ) + Zthresh;
+            youtput = frac(1, k_c * 20) * ( exp( k_c * 20 * ( ylabview - Zthresh )) - 1 ) + Zthresh;
         }
         break;
-    case 1:
-        if (current_current >= current_setpoint && current_last < current_setpoint) {
-            Zthresh = ylabview_current;
+    case 1: //Late force
+        if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
+            Zthresh = ylabview;
         }
         if (current_current <= spc_percent * current_setpoint) {
             youtput = ylabview;
         }
         else {
-            youtput = c_yscaling * (ylabview - Zthresh) + Zthresh;
-            if (youtput < ylabview) {
-                youtput = ylabview;
-            }
+            youtput = frac(1, k_c * 5) * (exp(k_c * 5 * (ylabview - Zthresh)) - 1) + Zthresh;
         }
         break;
     case 2:
