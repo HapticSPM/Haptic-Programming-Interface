@@ -291,16 +291,11 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         double k2 = 0.1;
         double c3 = 1.2;
         switch (forcesetting) {
-        case 0: //Exponential position scaling
-            force_y = k_a * 8 * 2.2 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(k_b * frac(1, 100) * current_current + 1);
+        case 0: //Log w/ Exponential position scaling
+            force_y = k_a * 2.48218 * std::log(k_b * frac(1, current_setpoint) * current_current + 1);
             break;
-        case 1: //Simple Log Scale
-            if (current_current <= spc_percent * current_setpoint) {
-                force_y = 0;
-            }
-            else {
-                force_y = k_a * 2.2 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(k_b * (current_current - spc_percent * current_setpoint) + 1);
-            }
+        case 1: //Log w/ Linear position scaling
+            force_y = k_a * 2.48218 * std::log(k_b * frac(1, current_setpoint) * current_current + 1);
             break;
         case 2: //Linear Scale
             if (current_current > spc_percent * current_setpoint) {
@@ -615,7 +610,7 @@ __declspec(dllexport) void forceconfig(double a, double b, double c) {
 
 __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
     double youtput;
-    const double c_yscaling = 0.07;
+    const double c_yscaling = 0.1;
     for (long long int i = ylabview_last.size(); i > 1; i--) {
         ylabview_last[i - 1] = ylabview_last[i - 2];
     }
@@ -635,15 +630,18 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
             youtput = frac(1, k_c * 20) * ( exp( k_c * 20 * ( ylabview - Zthresh )) - 1 ) + Zthresh;
         }
         break;
-    case 1: //Late force
+    case 1: //Linear Scaling
         if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-            Zthresh = ylabview;
+            Zthresh = ylabview_current;
         }
         if (current_current <= spc_percent * current_setpoint) {
             youtput = ylabview;
         }
         else {
-            youtput = frac(1, k_c * 5) * (exp(k_c * 5 * (ylabview - Zthresh)) - 1) + Zthresh;
+            youtput = c_yscaling * (ylabview - Zthresh) + Zthresh;
+            if (youtput < ylabview) {
+                youtput = ylabview;
+            }
         }
         break;
     case 2:
