@@ -27,7 +27,7 @@ extern "C" __declspec(dllexport) double getphi();
 
 extern "C" __declspec(dllexport) double getpsi();
 
-extern "C" __declspec(dllexport) int clicks(bool reset);
+extern "C" __declspec(dllexport) int clicks(bool reset, bool planing);
 
 extern "C" __declspec(dllexport) void datain(double output);
 

@@ -146,6 +146,9 @@ double force(double c) {
 //Number of clicks for planing, 3 is necessary before the plane becomes 'active'. 
 //A click is triggered by experiencing a sufficient level of downward force.
 int num_clicks = 0;
+//Planing toggle
+bool planingtoggle = false;
+
 //Frame count used for delay
 int frames = 0;
 //Wait after each click
@@ -357,7 +360,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 
 
     //handles the sequence of choosing points on a plane
-    if (num_clicks <= 2 && frames == wait) {
+    if (num_clicks <= 2 && frames == wait && planingtoggle) {
         h_nano = height_i;
         if ((force_y_nodrag_current <= forcetrigger) && (force_y_nodrag_last >= forcetrigger)) {
             frames = 0;
@@ -550,10 +553,11 @@ __declspec(dllexport) void origin(double xorg, double zorg) {
 }
 
 //counts the number of clicks
-__declspec(dllexport) int clicks(bool reset) {
+__declspec(dllexport) int clicks(bool reset, bool planing) {
     if (reset) {
         num_clicks = 0;
     }
+    planingtoggle = planing;
     int seq;
     seq = num_clicks;
     return seq;
