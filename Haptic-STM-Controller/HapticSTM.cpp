@@ -718,14 +718,6 @@ __declspec(dllexport) double zlimit(double yscaledinput) {
     return Zmax;
 }
 
-__declspec(dllexport) bool zlimitreached() {
-    bool pastlimit = false;
-    if (current_current >= current_max) {
-        pastlimit = true;
-    }
-    return pastlimit;
-}
-
 __declspec(dllexport) double zslower(double nanonis_zpos_read, double labview_zpos_write, double maxvel) {
     maxvel = maxvel * 0.001; //nm per millisecond to nm to second
     double newzpos;
