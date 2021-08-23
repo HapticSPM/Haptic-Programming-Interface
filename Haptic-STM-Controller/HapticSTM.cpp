@@ -148,7 +148,6 @@ double force(double c) {
 int num_clicks = 0;
 //Planing toggle
 bool planingtoggle = false;
-
 //Frame count used for delay
 int frames = 0;
 //Wait after each click
