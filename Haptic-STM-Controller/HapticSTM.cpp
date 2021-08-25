@@ -247,6 +247,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     x_nano = mapx(position[0]);
     z_nano = mapz(position[2]);
 
+
     //these if statements calculate the forces for the bounding box
     //x:
     if (x_nano == 0)
@@ -605,10 +606,12 @@ __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double
     forcesetting = forcemode;
 }
 
-__declspec(dllexport) void forceconfig(double a, double b, double c) {
+__declspec(dllexport) void forceconfig(double a, double b, double c, double spc) {
     k_a = a;
     k_b = b;
     k_c = c;
+    spc_percent = spc;
+
 }
 
 __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {

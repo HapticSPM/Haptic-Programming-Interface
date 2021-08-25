@@ -61,4 +61,4 @@ extern "C" __declspec(dllexport) double zslower(double nanonis_zpos_read, double
 
 extern "C" __declspec(dllexport) double yforcetestnodrag();
 
-extern "C" __declspec(dllexport) void forceconfig(double a, double b, double c);
+extern "C" __declspec(dllexport) void forceconfig(double a, double b, double c, double spc);
