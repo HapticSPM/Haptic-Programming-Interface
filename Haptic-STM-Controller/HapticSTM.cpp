@@ -113,6 +113,8 @@ double current_last = 0;
 double spc_percent = 0.50;
 //Minimum current it takes to write a force
 double mincurrent = 0;
+//Safetip, true if the tip exhibits dangerous behavior
+bool safetip = false;
 
 
 /*** FORCE PARAMETERS ***/
@@ -448,7 +450,7 @@ __declspec(dllexport) int start()
     if (HD_DEVICE_ERROR(error = hdGetError()))
     {
         //Failed to initialize haptic device
-        return -1;
+        return -2;
     }
 
     // Start the servo scheduler and enable forces.
@@ -465,7 +467,7 @@ __declspec(dllexport) int start()
     HDCallbackCode hPlaneCallback = hdScheduleAsynchronous(
         FrictionlessPlaneCallback, 0, HD_DEFAULT_SCHEDULER_PRIORITY);
 
-    while (!_kbhit())
+    while (safetip == false)
     {
         return 3;
         if (!hdWaitForCompletion(hPlaneCallback, HD_WAIT_CHECK_STATUS))
@@ -783,6 +785,10 @@ __declspec(dllexport) double yforcetestnodrag() {
         force_y = 0;
     }
     return force_y;
+}
+
+__declspec(dllexport) void safetiptrigger(bool triggered) {
+    safetip = triggered;
 }
 
 //Shuts down device
