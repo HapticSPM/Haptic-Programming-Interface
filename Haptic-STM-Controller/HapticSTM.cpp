@@ -353,7 +353,14 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     
     //writes calculated forces to the device
     hduVector3Dd finalforce = { force_x, force_y, force_z };
-    hdSetDoublev(HD_CURRENT_FORCE, finalforce);
+    if (safetip == false) {
+        hdSetDoublev(HD_CURRENT_FORCE, finalforce);
+    }
+    else {
+        hduVector3Dd zeroforce = { 0, 0, 0 };
+        hdSetDoublev(HD_CURRENT_FORCE, zeroforce);
+    }
+        
         
     HDint nCurrentButtons;
     hdGetIntegerv(HD_CURRENT_BUTTONS, &nCurrentButtons);
@@ -489,11 +496,12 @@ __declspec(dllexport) double getposx() {
     xf_current = frac(fw_zoom, fw_nano) * x_nano + x0_nano;
     return xf_current;
 }
-__declspec(dllexport) double getposy() {
+__declspec(dllexport) double getposy(double shift) {
     //Note: Y rescaling is done in labview
+    //Not anymore bitch
     hduVector3Dd position;
     hdGetDoublev(HD_CURRENT_POSITION, position);
-    return position[1];
+    return position[1] - shift;
 }
 __declspec(dllexport) double getposz() {
     zf_last = zf_current;

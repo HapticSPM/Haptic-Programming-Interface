@@ -9,7 +9,7 @@ extern "C" __declspec(dllexport) int start();
 
 extern "C" __declspec(dllexport) double getposx();
 
-extern "C" __declspec(dllexport) double getposy();
+extern "C" __declspec(dllexport) double getposy(double shift);
 
 extern "C" __declspec(dllexport) double getposz();
 
