@@ -212,8 +212,6 @@ double Zthresh = 0;
 std::string Zthresh_data;
 //The maximum Z at which the current has exceeded the maximum current
 double Zmax = 0;
-
-
 double yk = 1;
 
 /*** HAPTIC CALLBACK ***/
@@ -302,30 +300,10 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         case 1: //Log w/ Linear position scaling
             force_y = k_a * 2.48218 * std::log(k_b * frac(1, current_setpoint) * current_current + 1);
             break;
-        case 2: //Linear Scale
-            if (current_current > spc_percent * current_setpoint) {
-                force_y = (k2 / (spc_percent * current_setpoint)) * (current_current - spc_percent * current_setpoint);
-            }
-            else if (current_current <= spc_percent * current_setpoint) {
-                force_y = 0;
-            }
-            break;
-        case 3: //Stacked Logs
-            if (current_current > spc_percent * current_setpoint) {
-                force_y = std::log(current_current / (0.25 * current_setpoint));
-            }
-            else if (current_current < mincurrent) {
-                force_y = 0;
-            }
-            else {
-                force_y = (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
-            }
-
-        default:
-            force_y = 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
+        default: //Case 0
+            force_y = k_a * 2.48218 * std::log(k_b * frac(1, current_setpoint) * current_current + 1);
             break;
         }
-        
 
         if (force_y > force_y_max) {
             force_y = force_y_max;
@@ -338,11 +316,8 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     force_y_nodrag_last = force_y_nodrag_current;
     force_y_nodrag_current = force_y;
 
-    //if (current <= 5) {
-        force_y = -2 * dragc_z * velocity[1] + force_y;
-    //}
+    force_y = -2 * dragc_z * velocity[1] + force_y;
 
-    
     //Sets wait time between choosing points, 1st takes longer
     if (num_clicks == 0) {
         wait = 3500;
@@ -660,34 +635,6 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
             }
         }
         break;
-    case 2:
-        if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-            Zthresh = ylabview_current;
-        }
-        if (current_current <= spc_percent * current_setpoint) {
-            youtput = ylabview;
-        }
-        else {
-            youtput = c_yscaling * (ylabview - Zthresh) + Zthresh;
-            if (youtput < ylabview) {
-                youtput = ylabview;
-            }
-        }
-        break;
-    case 3:
-        if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-            Zthresh = ylabview_current;
-        }
-        if (current_current <= spc_percent * current_setpoint) {
-        youtput = ylabview;
-        }
-        else {
-            youtput = c_yscaling * (ylabview - Zthresh) + Zthresh;
-            if (youtput < ylabview) {
-                youtput = ylabview;
-            }
-        }
-        break;
     default:
         if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
             Zthresh = ylabview;
@@ -700,7 +647,6 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
             youtput = frac(1, 5) * (exp(5 * (ylabview - Zthresh)) - 1) + Zthresh;
         }
     }
-
    
     
     if (youtput > 10000) {
@@ -744,55 +690,6 @@ __declspec(dllexport) double zslower(double nanonis_zpos_read, double labview_zp
         newzpos = labview_zpos_write;
     }
     return newzpos;
-}
-
-__declspec(dllexport) double yforcetestnodrag() {
-    double k2 = 0.1;
-    double c3 = 1.2;
-    switch (forcesetting) {
-    case 0: //Exponential position scaling
-        force_y = 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
-        break;
-    case 1: //Simple Log Scale
-        if (current_current > current_setpoint) {
-            force_y = std::log(current_current / current_setpoint);
-        }
-        else if (current_current <= current_setpoint) {
-            force_y = 0;
-        }
-        break;
-    case 2: //Linear Scale
-        if (current_current > spc_percent * current_setpoint) {
-            force_y = (k2 / (spc_percent * current_setpoint)) * (current_current - spc_percent * current_setpoint);
-        }
-        else if (current_current <= spc_percent * current_setpoint) {
-            force_y = 0;
-        }
-        break;
-    case 3: //Stacked Logs
-       if (current_current > spc_percent * current_setpoint) {
-            force_y = std::log(current_current / (0.25 * current_setpoint));
-        }
-        else if (current_current < mincurrent) {
-            force_y = 0;
-        }
-        else {
-            force_y = (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
-        }
-
-    default:
-        force_y = 1.5 * (std::log(4 * spc_percent) / std::log(spc_percent * current_setpoint + 1)) * std::log(current_current + 1);
-        break;
-    }
-
-
-    if (force_y > force_y_max) {
-        force_y = force_y_max;
-    }
-    else if (force_y < 0) {
-        force_y = 0;
-    }
-    return force_y;
 }
 
 __declspec(dllexport) void safetiptrigger(bool triggered) {
