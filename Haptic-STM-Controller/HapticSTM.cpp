@@ -620,6 +620,10 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
         else {
             youtput = frac(1, k_c * 20) * ( exp( k_c * 20 * ( ylabview - Zthresh )) - 1 ) + Zthresh;
         }
+        if (youtput >= ylabview && ylabview >= Zthresh) {
+            youtput = ylabview;
+        }
+
         break;
     case 1: //Linear Scaling
         if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
