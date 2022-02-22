@@ -142,6 +142,14 @@ double k_c = 1;
 double force(double c) {
     return 1.2 * std::log(c / (current_setpoint - 40));
 }
+double lin(double xv) {
+    if ( std::pow(10,8)*xv >= 1) {
+        return 10 * std::log(std::pow(10, 8) * xv);
+    }
+    else {
+        return 0;
+    }
+}
 
 
 /*** PLANING SEQUENCE ***/
@@ -300,6 +308,30 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         case 1: //Log w/ Linear position scaling
             force_y = k_a * 2.48218 * std::log(k_b * frac(1, current_setpoint) * current_current + 1);
             break;
+        case 2: //Coulomb Potential w/ Exponential position scaling.
+            if (current_current >= 300) {
+                force_y = force_y_max;
+            }
+            else {
+                force_y = 100 / std::pow(lin(current_current) - 240, 2);
+            }
+            break;
+        case 3: //Lennard-Jones Potential w/ Exponential position scaling.
+            if (current_current >= 200) {
+                force_y = force_y_max;
+            }
+            else {
+                force_y = -4 * 3 * ((6*std::pow(9,6))/std::pow(fabs(lin(current_current)-240),7)- (12 * std::pow(9, 12)) / std::pow(fabs(lin(current_current) - 240), 13));
+            }
+            break;
+        case 4: //Coulomb Potential w/ Exponential position scaling.
+            if (current_current >= 300) {
+                force_y = force_y_max;
+            }
+            else {
+                force_y = 100 / std::pow(lin(current_current) - 240, 2);
+            }
+            break;
         default: //Case 0
             force_y = k_a * 2.48218 * std::log(k_b * frac(1, current_setpoint) * current_current + 1);
             break;
@@ -308,7 +340,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         if (force_y > force_y_max) {
             force_y = force_y_max;
         }
-        else if (force_y < 0) {
+        else if (force_y < 0 && forcesetting != 3) {
             force_y = 0;
         }
     }
@@ -639,16 +671,18 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
             }
         }
         break;
-    default:
+    default://Exponential
         if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
             Zthresh = ylabview;
         }
         if (current_current <= spc_percent * current_setpoint) {
-            yk = 1;
             youtput = ylabview;
         }
         else {
-            youtput = frac(1, 5) * (exp(5 * (ylabview - Zthresh)) - 1) + Zthresh;
+            youtput = frac(1, k_c * 20) * (exp(k_c * 20 * (ylabview - Zthresh)) - 1) + Zthresh;
+        }
+        if (youtput >= ylabview && ylabview >= Zthresh) {
+            youtput = ylabview;
         }
     }
    
