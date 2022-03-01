@@ -335,6 +335,14 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         case 5: //Linear w/ Exponential position scaling.
             force_y = k_a * current_current / 50;
             break;
+        case 6: //Lennard-Jones Potential w/ Linear PW
+            if (current_current <= 151.122) {
+                force_y = k_a / 25 *(current_current - 151.122);
+            }
+            else {
+                force_y = k_a * -1.0 * 4.0 * 3.0 * ((6 * std::pow(50, 6)) / std::pow(fabs(10 * lin(current_current) - 240), 7) - (12 * std::pow(50, 12)) / std::pow(fabs(10 * lin(current_current) - 240), 13));
+            }
+            break;
         default: //Case 0
             force_y = k_a * 2.48218 * std::log(k_b * frac(1, current_setpoint) * current_current + 1);
             break;
