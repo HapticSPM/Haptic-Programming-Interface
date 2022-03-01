@@ -321,16 +321,19 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
                 force_y = force_y_max;
             }
             else {
-                force_y = -4 * 3 * ((6*std::pow(9,6))/std::pow(fabs(lin(current_current)-240),7)- (12 * std::pow(9, 12)) / std::pow(fabs(lin(current_current) - 240), 13));
+                force_y = k_a * -1.0 * 4.0 * 3.0 * ((6*std::pow(50,6))/std::pow(fabs(10 * lin(current_current)-240),7)- (12 * std::pow(50, 12)) / std::pow(fabs(10 * lin(current_current) - 240), 13));
             }
             break;
-        case 4: //Coulomb Potential w/ Exponential position scaling.
+        case 4: //R^6 w/ Exponential position scaling.
             if (current_current >= 300) {
                 force_y = force_y_max;
             }
             else {
-                force_y = 100 / std::pow(lin(current_current) - 240, 2);
+                force_y = k_a * 1000 / std::pow(lin(current_current) - 240, 6);
             }
+            break;
+        case 5: //Linear w/ Exponential position scaling.
+            force_y = k_a * current_current / 50;
             break;
         default: //Case 0
             force_y = k_a * 2.48218 * std::log(k_b * frac(1, current_setpoint) * current_current + 1);
@@ -524,8 +527,16 @@ __declspec(dllexport) double getforcex() {
 }
 __declspec(dllexport) double getforcey() {
     hduVector3Dd force;
+    hduVector3Dd force_last;
     hdGetDoublev(HD_CURRENT_FORCE, force);
-    return force[1];
+    hdGetDoublev(HD_LAST_FORCE, force_last);
+    if (force[1] == 0 && force_last[1] > 1) {
+        return force_last[1];
+    }
+    else {
+        return force[1];
+    }
+    
 }
 __declspec(dllexport) double getforcez() {
     hduVector3Dd force;
