@@ -287,15 +287,75 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     }   
     
     if (feedbackmode == 1) {
-        //Calculates y force depending on the input height from LabView (or the default value)
-        if (position[1] <= h_nano)
-        {
-            double penetrationDistance = fabs(position[1] - h_nano);
-            force_y = planeStiffness * penetrationDistance;
+        switch (forcesetting) {
+            case 0:
+                //Calculates y force depending on the input height from LabView (or the default value)
+                if (position[1] <= h_nano)
+                {
+                    double penetrationDistance = fabs(position[1] - h_nano);
+                    force_y = planeStiffness * penetrationDistance;
 
-        }
-        else {
-            force_y = 0;
+                }
+                else {
+                    force_y = 0;
+                }
+                break;
+            case 1: //LJ
+                //Calculates y force depending on the input height from LabView (or the default value)
+                if (position[1] <= h_nano)
+                {
+                    double penetrationDistance = fabs(position[1] - h_nano);
+                    force_y = -4.0 * 0.5 * (6 / std::pow(penetrationDistance / -30 + 2.05, 7) - 12 / std::pow(penetrationDistance / -30 + 2.05, 13));
+                }
+                else {
+                    force_y = 0;
+                }
+                break;
+            case 2: //Coulomb
+                //Calculates y force depending on the input height from LabView (or the default value)
+                if (position[1] <= h_nano)
+                {
+                    double penetrationDistance = fabs(position[1] - h_nano);
+                    force_y = 0.7 / std::pow(penetrationDistance / -15 + 2.17, 2) - 0.12;
+                }
+                else {
+                    force_y = 0;
+                }
+                break;
+            case 3: //R^6
+                //Calculates y force depending on the input height from LabView (or the default value)
+                if (position[1] <= h_nano)
+                {
+                    double penetrationDistance = fabs(position[1] - h_nano);
+                    force_y = 1 / std::pow(penetrationDistance / -15 + 1.84, 6);
+                }
+                else {
+                    force_y = 0;
+                }
+                break;
+            case 4: //Exponential
+            //Calculates y force depending on the input height from LabView (or the default value)
+                if (position[1] <= h_nano)
+                {
+                    double penetrationDistance = fabs(position[1] - h_nano);
+                    force_y = std::pow(2.71828, 0.1 * penetrationDistance - 2) - 0.1;
+                }
+                else {
+                    force_y = 0;
+                }
+                break;
+            default:
+                //Calculates y force depending on the input height from LabView (or the default value)
+                if (position[1] <= h_nano)
+                {
+                    double penetrationDistance = fabs(position[1] - h_nano);
+                    force_y = planeStiffness * penetrationDistance;
+
+                }
+                else {
+                    force_y = 0;
+                }
+                break;
         }
     }
     else {
@@ -351,7 +411,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         if (force_y > force_y_max) {
             force_y = force_y_max;
         }
-        else if (force_y < 0 && forcesetting != 3) {
+        else if (force_y < 0 && ((forcesetting != 3 && feedbackmode == 0) || (forcesetting != 1 && feedbackmode == 1))) {
             force_y = 0;
         }
     }
