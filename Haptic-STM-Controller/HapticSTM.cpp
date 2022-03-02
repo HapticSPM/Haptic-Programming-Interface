@@ -631,7 +631,7 @@ __declspec(dllexport) double getpsi() {
 }
 
 //Parameters from LabView
-__declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback) {
+__declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback, int forcemode) {
     height_i = ypos;
     fw_nano = sizeofimgx;
     fh_nano = sizeofimgz;
@@ -642,6 +642,7 @@ __declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeo
     dragc_x = dragc;
     dragc_z = dragc_x;
     feedbackmode = feedback;
+    forcesetting = forcemode;
 }
 __declspec(dllexport) void origin(double xorg, double zorg) {
     x0_nano = xorg;

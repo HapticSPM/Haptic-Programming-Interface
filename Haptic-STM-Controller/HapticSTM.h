@@ -3,7 +3,7 @@
 #pragma once
 
 
-extern "C" __declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback);
+extern "C" __declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback, int forcemode);
 
 extern "C" __declspec(dllexport) int start();
 
