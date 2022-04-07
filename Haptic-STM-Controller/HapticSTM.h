@@ -51,9 +51,9 @@ extern "C" __declspec(dllexport) int buttonstate();
 
 extern "C" __declspec(dllexport) double threshhold();
 
-extern "C" __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin, int forcemode);
+extern "C" __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin, int forcemode, bool afmmode);
 
-extern "C" __declspec(dllexport) double yrescale(double ylabview, double scalingfactor);
+extern "C" __declspec(dllexport) double yrescale(double ylabview, double scalingfactor, double surf, double plunge);
 
 extern "C" __declspec(dllexport) double zlimit(double yscaledinput);
 

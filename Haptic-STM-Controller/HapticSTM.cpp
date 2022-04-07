@@ -115,6 +115,7 @@ double spc_percent = 0.50;
 double mincurrent = 0;
 //Safetip, true if the tip exhibits dangerous behavior
 bool safetip = false;
+bool afmtoggle = false;
 
 
 /*** FORCE PARAMETERS ***/
@@ -286,7 +287,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         force_z = -1 * dragc_z * velocity[2];
     }   
     
-    if (feedbackmode == 1) {
+    if (feedbackmode == 1 && afmtoggle == false) {
         switch (forcesetting) {
             case 0:
                 //Calculates y force depending on the input height from LabView (or the default value)
@@ -358,7 +359,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
                 break;
         }
     }
-    else {
+    else if (afmtoggle == false) {
         double k2 = 0.1;
         double c3 = 1.2;
         switch (forcesetting) {
@@ -415,6 +416,12 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             force_y = 0;
         }
     }
+    else {//AFM force
+        force_y = k_a * 0.5 * current_current;
+        if (fabs(force_y) > force_y_max) {
+            force_y = force_y_max * force_y / fabs(force_y);
+        }
+    }
 
     force_y_nodrag_last = force_y_nodrag_current;
     force_y_nodrag_current = force_y;
@@ -437,8 +444,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     else {
         hduVector3Dd zeroforce = { 0, 0, 0 };
         hdSetDoublev(HD_CURRENT_FORCE, zeroforce);
-    }
-        
+    }   
         
     HDint nCurrentButtons;
     hdGetIntegerv(HD_CURRENT_BUTTONS, &nCurrentButtons);
@@ -692,9 +698,16 @@ __declspec(dllexport) double vely() {
 __declspec(dllexport) double velz() {
     return velocity[2] * scale_z * frac(fh_zoom, fh_nano);
 }
-__declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin, int forcemode) {
-    current_last = fabs(current_current);
-    current_current = fabs(currentin);
+__declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin, int forcemode, bool afmmode) {
+    afmtoggle = afmmode;
+    if (afmmode == false) {
+        current_last = fabs(current_current);
+        current_current = fabs(currentin);
+    }
+    else {
+        current_last = current_current;
+        current_current = currentin;
+    }
     force_y_max = maxforcey;
     force_y_min = minforcey;
     current_setpoint = fabs(setpoint);
@@ -710,7 +723,7 @@ __declspec(dllexport) void forceconfig(double a, double b, double c, double spc)
 
 }
 
-__declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
+__declspec(dllexport) double yrescale(double ylabview, double scalingfactor, double surf, double plunge) {
     double youtput;
     const double c_yscaling = 0.1;
     for (long long int i = ylabview_last.size(); i > 1; i--) {
@@ -719,52 +732,60 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor) {
     ylabview_last[0] = ylabview_current;
     ylabview_current = ylabview;
 
+    if (afmtoggle == false) {
+        switch (forcesetting) {
+        case 0: //Exponential Scaling
+            if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
+                Zthresh = ylabview;
+            }
+            if (current_current <= spc_percent * current_setpoint) {
+                youtput = ylabview;
+            }
+            else {
+                youtput = frac(1, k_c * 20) * (exp(k_c * 20 * (ylabview - Zthresh)) - 1) + Zthresh;
+            }
+            if (youtput >= ylabview && ylabview >= Zthresh) {
+                youtput = ylabview;
+            }
 
-    switch (forcesetting) {
-    case 0: //Exponential Scaling
-        if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-            Zthresh = ylabview;
-        }
-        if (current_current <= spc_percent * current_setpoint) {
-            youtput = ylabview;
-        }
-        else {
-            youtput = frac(1, k_c * 20) * ( exp( k_c * 20 * ( ylabview - Zthresh )) - 1 ) + Zthresh;
-        }
-        if (youtput >= ylabview && ylabview >= Zthresh) {
-            youtput = ylabview;
-        }
-
-        break;
-    case 1: //Linear Scaling
-        if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-            Zthresh = ylabview_current;
-        }
-        if (current_current <= spc_percent * current_setpoint) {
-            youtput = ylabview;
-        }
-        else {
-            youtput = c_yscaling * (ylabview - Zthresh) + Zthresh;
-            if (youtput < ylabview) {
+            break;
+        case 1: //Linear Scaling
+            if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
+                Zthresh = ylabview_current;
+            }
+            if (current_current <= spc_percent * current_setpoint) {
+                youtput = ylabview;
+            }
+            else {
+                youtput = c_yscaling * (ylabview - Zthresh) + Zthresh;
+                if (youtput < ylabview) {
+                    youtput = ylabview;
+                }
+            }
+            break;
+        default://Exponential
+            if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
+                Zthresh = ylabview;
+            }
+            if (current_current <= spc_percent * current_setpoint) {
+                youtput = ylabview;
+            }
+            else {
+                youtput = frac(1, k_c * 20) * (exp(k_c * 20 * (ylabview - Zthresh)) - 1) + Zthresh;
+            }
+            if (youtput >= ylabview && ylabview >= Zthresh) {
                 youtput = ylabview;
             }
         }
-        break;
-    default://Exponential
-        if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-            Zthresh = ylabview;
-        }
-        if (current_current <= spc_percent * current_setpoint) {
+    }
+    else {//AFM scaling
+        if (ylabview >= surf) {
             youtput = ylabview;
         }
         else {
-            youtput = frac(1, k_c * 20) * (exp(k_c * 20 * (ylabview - Zthresh)) - 1) + Zthresh;
-        }
-        if (youtput >= ylabview && ylabview >= Zthresh) {
-            youtput = ylabview;
+            youtput = plunge * exp(1 / plunge * (ylabview - surf)) - plunge + surf;
         }
     }
-   
     
     if (youtput > 10000) {
         return ylabview;
