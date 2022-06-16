@@ -2,7 +2,7 @@
 #include "pch.h" // use stdafx.h in Visual Studio 2017 and earlier
 #include <utility>
 #include <limits.h>
-#include "HapticSTM.h"
+#include "HapticSPM.h"
 
 #ifdef  _WIN64
 #pragma warning (disable:4996)
@@ -580,17 +580,26 @@ __declspec(dllexport) double getposx() {
     xf_current = frac(fw_zoom, fw_nano) * x_nano + x0_nano;
     return xf_current;
 }
-__declspec(dllexport) double getposy(double shift) {
-    //Note: Y rescaling is done in labview
-    //Not anymore bitch
-    hduVector3Dd position;
-    hdGetDoublev(HD_CURRENT_POSITION, position);
-    return position[1] - shift;
-}
 __declspec(dllexport) double getposz() {
     zf_last = zf_current;
     zf_current = frac(fh_zoom, fh_nano) * z_nano + z0_nano;
     return zf_current;
+}
+__declspec(dllexport) double getposy(double shift) {
+    hduVector3Dd position;
+    hdGetDoublev(HD_CURRENT_POSITION, position);
+    return position[1] - shift;
+}
+
+__declspec(dllexport) double* pos_get(double shift) {
+    xf_last = xf_current;
+    xf_current = frac(fw_zoom, fw_nano) * x_nano + x0_nano;
+    zf_last = zf_current;
+    zf_current = frac(fh_zoom, fh_nano) * z_nano + z0_nano;
+    hduVector3Dd position;
+    hdGetDoublev(HD_CURRENT_POSITION, position);
+    double p[3] = { xf_current, zf_current, position[1] };
+    return p;
 }
 
 //Exports forces to LabView
