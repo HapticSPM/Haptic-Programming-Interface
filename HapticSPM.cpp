@@ -1,4 +1,4 @@
-// Position.cpp : Defines the exported functions for the DLL.
+// HapticSPM.cpp : Defines the exported functions for the DLL.
 #include "pch.h" // use stdafx.h in Visual Studio 2017 and earlier
 #include <utility>
 #include <limits.h>
@@ -18,7 +18,7 @@
 #include <HD/hd.h>
 #include <HDU/hduVector.h>
 #include <HDU/hduError.h>
-#include <HL/hl.h>
+
 
 #include <string>
 #include <iostream>
@@ -90,10 +90,10 @@ double fh_zoom = 159;
 
 /*** FEEDBACK MODE ***/
 /* Note: "Feedback mode" corresponds to the mode in which the haptic pen controls the x - y position in nanonis but not the z position.
-   The STM is left tunneling, the z position is read and converted to a force. "Raw" or "Feedbackless" mode is the mode in which all 
-   positions of the haptic pen (x, y, z) control the STM tip. The STM tunneling is turned off, and the tunneling current is converted 
-   to a force in the y direction. */       
-//The initial height of the plane from LabView before the planing.
+   The STM is left tunneling, the z position is read and converted to a force. "Raw" or "Feedbackless" mode is the mode in which all
+   positions of the haptic pen (x, y, z) control the STM tip. The STM tunneling is turned off, and the tunneling current is converted
+   to a force in the y direction. */
+   //The initial height of the plane from LabView before the planing.
 double height_i = 20;
 //The height of the plane based on the input data from nanonis (i.e. how the features are felt).
 double h_nano = 20;
@@ -144,7 +144,7 @@ double force(double c) {
     return 1.2 * std::log(c / (current_setpoint - 40));
 }
 double lin(double xv) {
-    if ( std::pow(10,8)*xv >= 1) {
+    if (std::pow(10, 8) * xv >= 1) {
         return 10 * std::log(std::pow(10, 8) * xv);
     }
     else {
@@ -227,13 +227,13 @@ double yk = 1;
 //This is where the main code is run and the forces are written. Most code is in this loop.
 HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 {
-    hdEnable(HD_MAX_FORCE_CLAMPING); 
+    hdEnable(HD_MAX_FORCE_CLAMPING);
 
     // Stiffness, i.e. k value, of the plane and walls.  Higher stiffness results
     // in a harder surface.
     const double planeStiffness = 0.35;
     const double wallStiffness = 0.35;
-    
+
     hdBeginFrame(hdGetCurrentDevice());
 
     //Gets forces
@@ -242,7 +242,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     hduVector3Dd currentforce;
     hdGetDoublev(HD_CURRENT_FORCE, currentforce);
     forcetrigger = force(current_setpoint);
-    
+
     // Get the position of the device.
     hduVector3Dd position;
     hdGetDoublev(HD_CURRENT_POSITION, position);
@@ -252,7 +252,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 
     //These map the raw position of the arm to the nanonis frame.
     //Both are bounded by [0, imgsize].
-    
+
     x_nano = mapx(position[0]);
     z_nano = mapz(position[2]);
 
@@ -285,78 +285,78 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     }
     else {
         force_z = -1 * dragc_z * velocity[2];
-    }   
-    
+    }
+
     if (feedbackmode == 1 && afmtoggle == false) {
         switch (forcesetting) {
-            case 0:
-                //Calculates y force depending on the input height from LabView (or the default value)
-                if (position[1] <= h_nano)
-                {
-                    double penetrationDistance = fabs(position[1] - h_nano);
-                    force_y = planeStiffness * penetrationDistance;
-
-                }
-                else {
-                    force_y = 0;
-                }
-                break;
-            case 1: //LJ
-                //Calculates y force depending on the input height from LabView (or the default value)
-                if (position[1] <= h_nano)
-                {
-                    double penetrationDistance = fabs(position[1] - h_nano);
-                    force_y = -4.0 * 0.5 * (6 / std::pow(penetrationDistance / -30 + 2.05, 7) - 12 / std::pow(penetrationDistance / -30 + 2.05, 13));
-                }
-                else {
-                    force_y = 0;
-                }
-                break;
-            case 2: //Coulomb
-                //Calculates y force depending on the input height from LabView (or the default value)
-                if (position[1] <= h_nano)
-                {
-                    double penetrationDistance = fabs(position[1] - h_nano);
-                    force_y = 0.7 / std::pow(penetrationDistance / -15 + 2.17, 2) - 0.12;
-                }
-                else {
-                    force_y = 0;
-                }
-                break;
-            case 3: //R^6
-                //Calculates y force depending on the input height from LabView (or the default value)
-                if (position[1] <= h_nano)
-                {
-                    double penetrationDistance = fabs(position[1] - h_nano);
-                    force_y = 1 / std::pow(penetrationDistance / -15 + 1.84, 6);
-                }
-                else {
-                    force_y = 0;
-                }
-                break;
-            case 4: //Exponential
+        case 0:
             //Calculates y force depending on the input height from LabView (or the default value)
-                if (position[1] <= h_nano)
-                {
-                    double penetrationDistance = fabs(position[1] - h_nano);
-                    force_y = std::pow(2.71828, 0.1 * penetrationDistance - 2) - 0.1;
-                }
-                else {
-                    force_y = 0;
-                }
-                break;
-            default:
-                //Calculates y force depending on the input height from LabView (or the default value)
-                if (position[1] <= h_nano)
-                {
-                    double penetrationDistance = fabs(position[1] - h_nano);
-                    force_y = planeStiffness * penetrationDistance;
+            if (position[1] <= h_nano)
+            {
+                double penetrationDistance = fabs(position[1] - h_nano);
+                force_y = planeStiffness * penetrationDistance;
 
-                }
-                else {
-                    force_y = 0;
-                }
-                break;
+            }
+            else {
+                force_y = 0;
+            }
+            break;
+        case 1: //LJ
+            //Calculates y force depending on the input height from LabView (or the default value)
+            if (position[1] <= h_nano)
+            {
+                double penetrationDistance = fabs(position[1] - h_nano);
+                force_y = -4.0 * 0.5 * (6 / std::pow(penetrationDistance / -30 + 2.05, 7) - 12 / std::pow(penetrationDistance / -30 + 2.05, 13));
+            }
+            else {
+                force_y = 0;
+            }
+            break;
+        case 2: //Coulomb
+            //Calculates y force depending on the input height from LabView (or the default value)
+            if (position[1] <= h_nano)
+            {
+                double penetrationDistance = fabs(position[1] - h_nano);
+                force_y = 0.7 / std::pow(penetrationDistance / -15 + 2.17, 2) - 0.12;
+            }
+            else {
+                force_y = 0;
+            }
+            break;
+        case 3: //R^6
+            //Calculates y force depending on the input height from LabView (or the default value)
+            if (position[1] <= h_nano)
+            {
+                double penetrationDistance = fabs(position[1] - h_nano);
+                force_y = 1 / std::pow(penetrationDistance / -15 + 1.84, 6);
+            }
+            else {
+                force_y = 0;
+            }
+            break;
+        case 4: //Exponential
+        //Calculates y force depending on the input height from LabView (or the default value)
+            if (position[1] <= h_nano)
+            {
+                double penetrationDistance = fabs(position[1] - h_nano);
+                force_y = std::pow(2.71828, 0.1 * penetrationDistance - 2) - 0.1;
+            }
+            else {
+                force_y = 0;
+            }
+            break;
+        default:
+            //Calculates y force depending on the input height from LabView (or the default value)
+            if (position[1] <= h_nano)
+            {
+                double penetrationDistance = fabs(position[1] - h_nano);
+                force_y = planeStiffness * penetrationDistance;
+
+            }
+            else {
+                force_y = 0;
+            }
+            break;
         }
     }
     else if (afmtoggle == false) {
@@ -382,7 +382,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
                 force_y = force_y_max;
             }
             else {
-                force_y = k_a * -1.0 * 4.0 * 3.0 * ((6*std::pow(50,6))/std::pow(fabs(10 * lin(current_current)-240),7)- (12 * std::pow(50, 12)) / std::pow(fabs(10 * lin(current_current) - 240), 13));
+                force_y = k_a * -1.0 * 4.0 * 3.0 * ((6 * std::pow(50, 6)) / std::pow(fabs(10 * lin(current_current) - 240), 7) - (12 * std::pow(50, 12)) / std::pow(fabs(10 * lin(current_current) - 240), 13));
             }
             break;
         case 4: //R^6 w/ Exponential position scaling.
@@ -398,7 +398,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             break;
         case 6: //Lennard-Jones Potential w/ Linear PW
             if (current_current <= 151.122) {
-                force_y = k_a / 25 *(current_current - 151.122);
+                force_y = k_a / 25 * (current_current - 151.122);
             }
             else {
                 force_y = k_a * -1.0 * 4.0 * 3.0 * ((6 * std::pow(50, 6)) / std::pow(fabs(10 * lin(current_current) - 240), 7) - (12 * std::pow(50, 12)) / std::pow(fabs(10 * lin(current_current) - 240), 13));
@@ -435,7 +435,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     else {
         wait = 1500;
     }
-    
+
     //writes calculated forces to the device
     hduVector3Dd finalforce = { force_x, force_y, force_z };
     if (safetip == false) {
@@ -444,8 +444,8 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     else {
         hduVector3Dd zeroforce = { 0, 0, 0 };
         hdSetDoublev(HD_CURRENT_FORCE, zeroforce);
-    }   
-        
+    }
+
     HDint nCurrentButtons;
     hdGetIntegerv(HD_CURRENT_BUTTONS, &nCurrentButtons);
 
@@ -463,7 +463,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             }
             else if (num_clicks == 1) {
                 point2 = posLV;
-                
+
                 //if statement here
                 num_clicks++;
             }
@@ -501,7 +501,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         x = x / lastframes;
         avgvel = x;
     }
-    
+
     if (num_clicks == 3) {
         if (frames < lastframes - 1) {
             frames++;
@@ -619,7 +619,7 @@ __declspec(dllexport) double getforcey() {
     else {
         return force[1];
     }
-    
+
 }
 __declspec(dllexport) double getforcez() {
     hduVector3Dd force;
@@ -796,14 +796,14 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor, dou
             youtput = plunge * exp(1 / plunge * (ylabview - surf)) - plunge + surf;
         }
     }
-    
+
     if (youtput > 10000) {
         return ylabview;
     }
     else {
         return youtput;
     }
-    
+
 }
 
 __declspec(dllexport) double threshhold() {
@@ -817,7 +817,7 @@ __declspec(dllexport) int buttonstate() {
 __declspec(dllexport) double zlimit(double yscaledinput) {
     yscaled_last = yscaled_current;
     yscaled_current = yscaledinput;
-    
+
     if (current_current >= current_max && current_last < current_max) {
         Zmax = yscaled_last;
     }
@@ -849,8 +849,8 @@ __declspec(dllexport) void shutdown() {
     num_clicks = 0;
     HHD hHD = hdInitDevice(HD_DEFAULT_DEVICE);
     HDCallbackCode hPlaneCallback = hdScheduleAsynchronous(
-    FrictionlessPlaneCallback, 0, HD_DEFAULT_SCHEDULER_PRIORITY);
+        FrictionlessPlaneCallback, 0, HD_DEFAULT_SCHEDULER_PRIORITY);
     hdStopScheduler();
     hdUnschedule(hPlaneCallback);
-    hdDisableDevice(hHD); 
+    hdDisableDevice(hHD);
 }

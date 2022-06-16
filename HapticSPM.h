@@ -1,7 +1,5 @@
 #pragma once
 
-#pragma once
-
 /*** PEN PROPERTIES - GET ***/
 //Position
 //this...
