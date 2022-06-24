@@ -29,10 +29,10 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="pch.cpp">
+    <ClCompile Include="HapticSPM.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="HapticSPM.cpp">
+    <ClCompile Include="pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,56 +1,46 @@
 #pragma once
 
-/*** PEN PROPERTIES - GET ***/
-//Position
-//this...
-extern "C" __declspec(dllexport) double getposx();
-extern "C" __declspec(dllexport) double getposz();
-extern "C" __declspec(dllexport) double getposy(double shift);
-//...gets replaced with this
-extern "C" __declspec(dllexport) double* pos_get(double shift);
+//Start & Stop Functions
+extern "C" __declspec(dllexport) int start_haptic_loop(int input);
+extern "C" __declspec(dllexport) void stop_haptic_loop();
 
-//Force
-extern "C" __declspec(dllexport) double getforcex();
-extern "C" __declspec(dllexport) double getforcey();
-extern "C" __declspec(dllexport) double getforcez();
+/*** PEN PROPERTIES ***/
+//Position
+extern "C" __declspec(dllexport) void position_get(double* output);
+extern "C" __declspec(dllexport) void position_reframed_get(const double* frame_properties, double *output);
 
 //Velocity
-extern "C" __declspec(dllexport) double velx();
-extern "C" __declspec(dllexport) double vely();
-extern "C" __declspec(dllexport) double velz();
+extern "C" __declspec(dllexport) void velocity_get(double* output);
+extern "C" __declspec(dllexport) void velocity_reframed_get(const double* frame_properties, double* output);
+
+//Force
+extern "C" __declspec(dllexport) void forces_get(double* output);
+extern "C" __declspec(dllexport) void forces_set(double* input);
+extern "C" __declspec(dllexport) void drag_force_set(int* toggle, double* coeff);
+extern "C" __declspec(dllexport) void force_extrema_set(double* maxforce, double* minforce);
+
+//Angles
+extern "C" __declspec(dllexport) void angles_get(double *output);
+
+//Button State
+extern "C" __declspec(dllexport) int8_t buttonstate_get();
+
+//Safety
+extern "C" __declspec(dllexport) void safety_trigger(bool input, bool *output);
+
+/*** OTHER STUFF ***/
+extern "C" __declspec(dllexport) void frame_wall_set(bool input, double k_wall);
+extern "C" __declspec(dllexport) void signal_input(double input_signal, double input_gain);
+extern "C" __declspec(dllexport) int8_t planing(bool reset, bool planing, double z_labview, double* output);
 
 
-extern "C" __declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback, int forcemode);
-
-extern "C" __declspec(dllexport) int start();
-
-extern "C" __declspec(dllexport) void shutdown();
 
 
 
-extern "C" __declspec(dllexport) double gettheta();
 
-extern "C" __declspec(dllexport) double getphi();
 
-extern "C" __declspec(dllexport) double getpsi();
-
-extern "C" __declspec(dllexport) int clicks(bool reset, bool planing);
-
-extern "C" __declspec(dllexport) void datain(double output);
-
-extern "C" __declspec(dllexport) double pd();
-
-extern "C" __declspec(dllexport) double pnx();
-
-extern "C" __declspec(dllexport) double pny();
-
-extern "C" __declspec(dllexport) double pnz();
-
-extern "C" __declspec(dllexport) void origin(double xorg, double zorg);
-
-extern "C" __declspec(dllexport) int buttonstate();
-
-extern "C" __declspec(dllexport) double threshhold();
+/*** CONFIG FUNCTIONS ***/
+extern "C" __declspec(dllexport) void config_old(double ypos, bool feedback, int forcemode);
 
 extern "C" __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin, int forcemode, bool afmmode);
 
@@ -59,7 +49,5 @@ extern "C" __declspec(dllexport) double yrescale(double ylabview, double scaling
 extern "C" __declspec(dllexport) double zlimit(double yscaledinput);
 
 extern "C" __declspec(dllexport) double zslower(double nanonis_zpos_read, double labview_zpos_write, double maxvel);
-
-extern "C" __declspec(dllexport) void safetiptrigger(bool triggered);
 
 extern "C" __declspec(dllexport) void forceconfig(double a, double b, double c, double spc);

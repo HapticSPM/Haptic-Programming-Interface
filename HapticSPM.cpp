@@ -2,6 +2,7 @@
 #include "pch.h" // use stdafx.h in Visual Studio 2017 and earlier
 #include <utility>
 #include <limits.h>
+#include <ctime>
 #include "HapticSPM.h"
 
 #ifdef  _WIN64
@@ -25,67 +26,39 @@
 #include <Windows.h>
 #include <vector>
 
-//Completely unnecessary but at this point I'm too afraid to change anything
-double frac(double xin, double yin) {
-    return xin / yin;
-}
-
 /***** BEGIN GLOBAL VARIABLES *****/
+
+
 
 /*** HAPTIC FRAME PROPERTIES ***/
 //Frame origin, the bottom left corner of the haptic workspace (in units of mm), the area in which the pen is bounded.
-const double x0_haptic = -60;
-const double z0_haptic = 80;
+const double frame_center_haptic[2] = { 0 , 20 };
 //The frame width and frame height of the haptic workspace (in units of mm).
-const double fw_haptic = 120;
-const double fh_haptic = 120;
+const double frame_size_haptic[2] = { 120 , 120 };
 
-/*** NANONIS FRAME PROPERTIES ***/
-//Frame origin, the very center of the frame set in scan mode of Nanonis.
-double x0_nano = 0;
-double z0_nano = 0;
-//Frame size, the width (x) and height (z) of the frame set in scan mode of Nanonis.
-double fw_nano = 159;
-double fh_nano = 159;
-//The x-z positions of the pen relative to the nanonis frame
-double x_nano;
-double z_nano;
-//Scaling constants for mapping purposes
-double scale_x = frac(fw_nano, fw_haptic);
-double scale_z = frac(fh_nano, fh_haptic);
-//Functions that maps the data
-double mapx(double xunmap) {
-    double xvar;
-    if (scale_x * (xunmap - x0_haptic) >= fw_nano) {
-        xvar = fw_nano;
-    }
-    else if (scale_x * (xunmap - x0_haptic) <= 0) {
-        xvar = 0;
-    }
-    else {
-        xvar = scale_x * (xunmap - x0_haptic);
-    }
-    return xvar;
-}
-double mapz(double zunmap) {
-    double zvar;
-    if (scale_z * (z0_haptic - zunmap) >= fh_nano) {
-        zvar = fh_nano;
-    }
-    else if (scale_z * (z0_haptic - zunmap) <= 0) {
-        zvar = 0;
-    }
-    else {
-        zvar = scale_z * (z0_haptic - zunmap);
-    }
-    return zvar;
-}
+int mode = 0;
 
+hduVector3Dd position;
+hduVector3Dd velocity;
+hduVector3Dd force_labview;
 
-/*** ZOOM FRAME PROPERTIES ***/
-//Parameters for the zoomed in canvas, as of now this feature is ignored and the zooming is done in Nanonis scan mode.
-double fw_zoom = 159;
-double fh_zoom = 159;
+bool wall_toggle = false;
+double wall_stiffness = 0.2;
+
+bool drag_toggle[3] = {false, false, false};
+double k_drag[3] = { 0.001 , 0.001 , 0.001 };
+
+double force_max[3] = { 3, 3, 3 };
+double force_min[3] = { -3, -3, -3 };
+
+double signal = 0;
+double gain = 1;
+
+double k[4] = { 1, 1, 1, 1 };
+
+int surface_force = 0;
+
+bool safetip = false;
 
 
 /*** FEEDBACK MODE ***/
@@ -93,13 +66,10 @@ double fh_zoom = 159;
    The STM is left tunneling, the z position is read and converted to a force. "Raw" or "Feedbackless" mode is the mode in which all
    positions of the haptic pen (x, y, z) control the STM tip. The STM tunneling is turned off, and the tunneling current is converted
    to a force in the y direction. */
-   //The initial height of the plane from LabView before the planing.
+//The initial height of the plane from LabView before the planing.
 double height_i = 20;
 //The height of the plane based on the input data from nanonis (i.e. how the features are felt).
 double h_nano = 20;
-//Feedbackmode toggle, when true, feedback mode is on, and when false, feedbackless mode is on.
-bool feedbackmode = 1;
-
 
 /*** CURRENT ***/
 //Setpoint Current, set in nanonis, roughly determines the current (pA) at which the force is neutral.
@@ -114,43 +84,31 @@ double spc_percent = 0.50;
 //Minimum current it takes to write a force
 double mincurrent = 0;
 //Safetip, true if the tip exhibits dangerous behavior
-bool safetip = false;
+
 bool afmtoggle = false;
+
 
 
 /*** FORCE PARAMETERS ***/
 //Sets the drag coefficients.
-double dragc_x = 0.001;
-double dragc_z = 2 * dragc_x;
+
+
+
 //The force component in each direction.
-double force_x = 0;
-double force_y = 0;
-double force_z = 0;
+
 //force_y limits.
 double force_y_max = 2.485;
 double force_y_min = 0.275;
-//y force necessary to register click
-double forcetrigger;
 //dragless force_y numbers
 double force_y_nodrag_current;
 double force_y_nodrag_last;
 //determines force scaling
-int forcesetting = 0;
+
 //Scaling factors
 double k_a = 1;
 double k_b = 1;
 double k_c = 1;
-double force(double c) {
-    return 1.2 * std::log(c / (current_setpoint - 40));
-}
-double lin(double xv) {
-    if (std::pow(10, 8) * xv >= 1) {
-        return 10 * std::log(std::pow(10, 8) * xv);
-    }
-    else {
-        return 0;
-    }
-}
+
 
 
 /*** PLANING SEQUENCE ***/
@@ -158,7 +116,7 @@ double lin(double xv) {
 //A click is triggered by experiencing a sufficient level of downward force.
 int num_clicks = 0;
 //Planing toggle
-bool planingtoggle = false;
+bool planing_toggle = false;
 //Frame count used for delay
 int frames = 0;
 //Wait after each click
@@ -179,30 +137,18 @@ void plane() {
 double planingdata_current = 0;
 double planingdata_last = 0;
 
-
-/*** VELOCITY ***/
-hduVector3Dd velocity;
-
-
-/*** AVERAGE VELOCITY ***/
-//Note: This averaging was meant to smooth the drag force. This is no longer necessary, but I'll leave this here in case it becomes useful again.
-//Amount of frames to be averaged over.
-const int lastframes = 100;
-//Vector of last velocities.
-std::vector<hduVector3Dd> lastvel(lastframes);
-//PROBLEM: no idea what this does
-bool testvar = false;
-hduVector3Dd avgvel;
+double lin(double xv) {
+    if (std::pow(10, 8) * xv >= 1) {
+        return 10 * std::log(std::pow(10, 8) * xv);
+    }
+    else {
+        return 0;
+    }
+}
 
 
 /*** SCALED Y ***/
 //Y position from the scaling done in labview (in units of nm)
-double yscaled_current;
-double yscaled_last;
-
-
-/*** BUTTON ***/
-int button_state;
 
 
 /*** POSITIONS ***/
@@ -223,237 +169,153 @@ std::string Zthresh_data;
 double Zmax = 0;
 double yk = 1;
 
+
+
 /*** HAPTIC CALLBACK ***/
-//This is where the main code is run and the forces are written. Most code is in this loop.
+//This is where the arm code is run and the forces are written.
 HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 {
     hdEnable(HD_MAX_FORCE_CLAMPING);
 
-    // Stiffness, i.e. k value, of the plane and walls.  Higher stiffness results
-    // in a harder surface.
     const double planeStiffness = 0.35;
-    const double wallStiffness = 0.35;
+    const double time_interval = 2;
+    time_t time_initial = time(NULL);
+    const double forcetrigger = 2;
+
+    hduVector3Dd force;
 
     hdBeginFrame(hdGetCurrentDevice());
 
-    //Gets forces
-    hduVector3Dd lastforce;
-    hdGetDoublev(HD_LAST_FORCE, lastforce);
-    hduVector3Dd currentforce;
-    hdGetDoublev(HD_CURRENT_FORCE, currentforce);
-    forcetrigger = force(current_setpoint);
-
-    // Get the position of the device.
-    hduVector3Dd position;
     hdGetDoublev(HD_CURRENT_POSITION, position);
-
-    // Get the velocity of the device.
     hdGetDoublev(HD_CURRENT_VELOCITY, velocity);
 
-    //These map the raw position of the arm to the nanonis frame.
-    //Both are bounded by [0, imgsize].
-
-    x_nano = mapx(position[0]);
-    z_nano = mapz(position[2]);
-
-
-    //these if statements calculate the forces for the bounding box
-    //x:
-    if (x_nano == 0)
-    {
-        double penetrationDistancex = frac(159, fw_nano) * fabs(scale_x * (position[0] - x0_haptic));
-        force_x = wallStiffness * penetrationDistancex;
-    }
-    else if (x_nano == fw_nano)
-    {
-        double penetrationDistancex = frac(159, fw_nano) * fabs(fw_nano - scale_x * (position[0] - x0_haptic));
-        force_x = -1 * wallStiffness * penetrationDistancex;
-    }
-    else {
-        force_x = -1 * dragc_x * velocity[0];
-    }
-    //z:
-    if (z_nano == 0)
-    {
-        double penetrationDistancez = frac(159, fh_nano) * fabs(scale_z * (z0_haptic - position[2]));
-        force_z = -1 * wallStiffness * penetrationDistancez;
-    }
-    else if (z_nano == fh_nano)
-    {
-        double penetrationDistancez = frac(159, fh_nano) * fabs(fh_nano - scale_z * (z0_haptic - position[2]));
-        force_z = wallStiffness * penetrationDistancez;
-    }
-    else {
-        force_z = -1 * dragc_z * velocity[2];
-    }
-
-    if (feedbackmode == 1 && afmtoggle == false) {
-        switch (forcesetting) {
-        case 0:
-            //Calculates y force depending on the input height from LabView (or the default value)
-            if (position[1] <= h_nano)
-            {
-                double penetrationDistance = fabs(position[1] - h_nano);
-                force_y = planeStiffness * penetrationDistance;
-
+    //Calculate z force
+    switch (mode) {
+    case 0: //Custom Mode
+        force = force_labview;
+        break;
+    case 1: //Read Mode
+        if (position[1] <= gain * signal) {
+            double penetrationDistance = fabs(position[1] - gain * signal);
+            switch (surface_force) {
+            case 0: //Linear Force
+                force[1] = k[0] * penetrationDistance;
+                break;
+            case 1: //Coulomb
+                force[1] = k[0] * 0.7 / std::pow(penetrationDistance / -15 + 2.17, 2) - 0.12;
+                break;
+            case 2: //Lennard-Jones Force
+                force[1] = k[0] * -4.0 * 0.5 * (6 / std::pow(penetrationDistance / -30 + 2.05, 7) - 12 / std::pow(penetrationDistance / -30 + 2.05, 13));
+                break;
+            case 3: //Van der Waals Force
+                force[1] = k[0] * 1 / std::pow(penetrationDistance / -15 + 1.84, 7);
+                break;
+            case 4: //Exponential
+                force[1] = k[0] * std::pow(2.71828, 0.1 * penetrationDistance - 2) - 0.1;
+                break;
+            default: //Linear
+                force[1] = k[0] * penetrationDistance;
+                break;
             }
-            else {
-                force_y = 0;
-            }
-            break;
-        case 1: //LJ
-            //Calculates y force depending on the input height from LabView (or the default value)
-            if (position[1] <= h_nano)
-            {
-                double penetrationDistance = fabs(position[1] - h_nano);
-                force_y = -4.0 * 0.5 * (6 / std::pow(penetrationDistance / -30 + 2.05, 7) - 12 / std::pow(penetrationDistance / -30 + 2.05, 13));
-            }
-            else {
-                force_y = 0;
-            }
-            break;
-        case 2: //Coulomb
-            //Calculates y force depending on the input height from LabView (or the default value)
-            if (position[1] <= h_nano)
-            {
-                double penetrationDistance = fabs(position[1] - h_nano);
-                force_y = 0.7 / std::pow(penetrationDistance / -15 + 2.17, 2) - 0.12;
-            }
-            else {
-                force_y = 0;
-            }
-            break;
-        case 3: //R^6
-            //Calculates y force depending on the input height from LabView (or the default value)
-            if (position[1] <= h_nano)
-            {
-                double penetrationDistance = fabs(position[1] - h_nano);
-                force_y = 1 / std::pow(penetrationDistance / -15 + 1.84, 6);
-            }
-            else {
-                force_y = 0;
-            }
-            break;
-        case 4: //Exponential
-        //Calculates y force depending on the input height from LabView (or the default value)
-            if (position[1] <= h_nano)
-            {
-                double penetrationDistance = fabs(position[1] - h_nano);
-                force_y = std::pow(2.71828, 0.1 * penetrationDistance - 2) - 0.1;
-            }
-            else {
-                force_y = 0;
-            }
-            break;
-        default:
-            //Calculates y force depending on the input height from LabView (or the default value)
-            if (position[1] <= h_nano)
-            {
-                double penetrationDistance = fabs(position[1] - h_nano);
-                force_y = planeStiffness * penetrationDistance;
-
-            }
-            else {
-                force_y = 0;
-            }
-            break;
         }
-    }
-    else if (afmtoggle == false) {
-        double k2 = 0.1;
-        double c3 = 1.2;
-        switch (forcesetting) {
-        case 0: //Log w/ Exponential position scaling
-            force_y = k_a * 2.48218 * std::log(k_b * frac(1, current_setpoint) * current_current + 1);
+        else {
+            force[1] = 0;
+        }
+        break;
+    case 2: //Write Mode
+        switch (surface_force) {
+        case 0: //Log Force
+            force[1] = k[0] * 2.48218 * std::log(k[1] * (1 / k[2]) * gain * signal + 1);
             break;
-        case 1: //Log w/ Linear position scaling
-            force_y = k_a * 2.48218 * std::log(k_b * frac(1, current_setpoint) * current_current + 1);
-            break;
-        case 2: //Coulomb Potential w/ Exponential position scaling.
-            if (current_current >= 300) {
-                force_y = force_y_max;
+        case 1: //Linear Force
+            force[1] = k[0] * gain * signal;
+        case 2: //Coulomb Force
+            if (gain * signal >= 300) {
+                force[1] = force_max[1];
             }
             else {
-                force_y = 100 / std::pow(lin(current_current) - 240, 2);
+                force[1] = k[0] * 100 / std::pow(lin(gain * signal) - 240, 2);
             }
             break;
         case 3: //Lennard-Jones Potential w/ Exponential position scaling.
-            if (current_current >= 200) {
-                force_y = force_y_max;
+            if (gain * signal >= 200) {
+                force[1] = force_max[1];
             }
             else {
-                force_y = k_a * -1.0 * 4.0 * 3.0 * ((6 * std::pow(50, 6)) / std::pow(fabs(10 * lin(current_current) - 240), 7) - (12 * std::pow(50, 12)) / std::pow(fabs(10 * lin(current_current) - 240), 13));
+                force[1] = k[1] * -1.0 * 4.0 * 3.0 * ((6 * std::pow(50, 6)) / std::pow(fabs(10 * lin(gain * signal) - 240), 7) - (12 * std::pow(50, 12)) / std::pow(fabs(10 * lin(gain * signal) - 240), 13));
             }
             break;
-        case 4: //R^6 w/ Exponential position scaling.
-            if (current_current >= 300) {
-                force_y = force_y_max;
-            }
-            else {
-                force_y = k_a * 1000 / std::pow(lin(current_current) - 240, 6);
-            }
-            break;
-        case 5: //Linear w/ Exponential position scaling.
-            force_y = k_a * current_current / 50;
-            break;
-        case 6: //Lennard-Jones Potential w/ Linear PW
-            if (current_current <= 151.122) {
-                force_y = k_a / 25 * (current_current - 151.122);
+        case 4: //Van der Waals
+            if (gain * signal >= 300) {
+                force[1] = force_max[1];
             }
             else {
-                force_y = k_a * -1.0 * 4.0 * 3.0 * ((6 * std::pow(50, 6)) / std::pow(fabs(10 * lin(current_current) - 240), 7) - (12 * std::pow(50, 12)) / std::pow(fabs(10 * lin(current_current) - 240), 13));
+                force[1] = k[0] * 1000 / std::pow(lin(gain * signal) - 240, 7);
             }
             break;
-        default: //Case 0
-            force_y = k_a * 2.48218 * std::log(k_b * frac(1, current_setpoint) * current_current + 1);
+        default: //Log
+            force[1] = k[0] * 2.48218 * std::log(k[1] * (1 / k[2]) * gain * signal + 1);
             break;
         }
-
-        if (force_y > force_y_max) {
-            force_y = force_y_max;
-        }
-        else if (force_y < 0 && ((forcesetting != 3 && feedbackmode == 0) || (forcesetting != 1 && feedbackmode == 1))) {
-            force_y = 0;
-        }
-    }
-    else {//AFM force
-        force_y = k_a * 0.5 * current_current;
-        if (fabs(force_y) > force_y_max) {
-            force_y = force_y_max * force_y / fabs(force_y);
-        }
+        break;
     }
 
-    force_y_nodrag_last = force_y_nodrag_current;
-    force_y_nodrag_current = force_y;
+    //Calculate xy forces & drag forces
+    if (wall_toggle) {
+        if (position[0] < frame_center_haptic[0] - frame_size_haptic[0] / 2) {
+            force[0] = wall_stiffness * (frame_center_haptic[0] - frame_size_haptic[0] / 2 - position[0]) + force[0];
+        }
+        else if (position[0] > frame_center_haptic[0] + frame_size_haptic[0] / 2) {
+            force[0] = (frame_center_haptic[0] + frame_size_haptic[0] / 2 - position[0]) + force[0];
+        }
+        else if (drag_toggle[0]){
+            force[0] = -1 * k_drag[0] * velocity[0] + force[0];
+        }
 
-    force_y = -2 * dragc_z * velocity[1] + force_y;
+        if (position[2] < frame_center_haptic[1] - frame_size_haptic[1] / 2) {
+            force[2] = wall_stiffness * (frame_center_haptic[1] - frame_size_haptic[1] / 2 - position[2]) + force[2];
+        }
+        else if (position[2] > frame_center_haptic[1] + frame_size_haptic[1] / 2) {
+            force[2] = wall_stiffness * (frame_center_haptic[1] + frame_size_haptic[1] / 2 - position[2]) + force[2];
+        }
+        else if (drag_toggle[2]) {
+            force[2] = -1 * k_drag[2] * velocity[2] + force[2];
+        }
 
-    //Sets wait time between choosing points, 1st takes longer
-    if (num_clicks == 0) {
-        wait = 3500;
-    }
+        if (drag_toggle[1]) {
+            force[1] = -1 * k_drag[1] * velocity[1] + force[1];
+        }
+    } 
     else {
-        wait = 1500;
+        for (int i = 0; i < 3; i++) {
+            if (drag_toggle[i]) {
+                force[i] = -1 * k_drag[i] * velocity[i] + force[i];
+            }
+        }
     }
 
-    //writes calculated forces to the device
-    hduVector3Dd finalforce = { force_x, force_y, force_z };
+    //Checks if the calculated forces are within the range of acceptable forces, and, if not, coerces them to within the range.
+    for (int i = 0; i < 3; i++) {
+        if (force[i] > force_max[i]) {
+            force[i] = force_max[i];
+        }
+        else if (force[i] < force_min[i]) {
+            force[i] = force_min[i];
+        }
+    }
+
+    //Writes the final forces
     if (safetip == false) {
-        hdSetDoublev(HD_CURRENT_FORCE, finalforce);
+        hdSetDoublev(HD_CURRENT_FORCE, force);
     }
     else {
         hduVector3Dd zeroforce = { 0, 0, 0 };
         hdSetDoublev(HD_CURRENT_FORCE, zeroforce);
     }
 
-    HDint nCurrentButtons;
-    hdGetIntegerv(HD_CURRENT_BUTTONS, &nCurrentButtons);
-
-    button_state = nCurrentButtons;
-
-
     //handles the sequence of choosing points on a plane
-    if (num_clicks <= 2 && frames == wait && planingtoggle) {
+
+    if (num_clicks <= 2 && frames == wait && planing_toggle) {
         h_nano = height_i;
         if ((force_y_nodrag_current <= forcetrigger) && (force_y_nodrag_last >= forcetrigger)) {
             frames = 0;
@@ -483,36 +345,6 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         frames++;
     }
 
-    // Finds the average velocity, could be used if the drag forces get out of control. As of now, they aren't used anywhere.
-    if (num_clicks == 3) {
-        lastvel[frames] = velocity;
-    }
-    hduVector3Dd x;
-
-    if (testvar == 1) {
-        for (int i = 0; i < lastframes; i++) {
-            if (i == 0) {
-                x = lastvel[i];
-            }
-            else {
-                x = x + lastvel[i];
-            }
-        }
-        x = x / lastframes;
-        avgvel = x;
-    }
-
-    if (num_clicks == 3) {
-        if (frames < lastframes - 1) {
-            frames++;
-
-        }
-        else {
-            frames = 0;
-            testvar = 1;
-        }
-    }
-
     hdEndFrame(hdGetCurrentDevice());
 
     // In case of error, terminate the callback.
@@ -530,9 +362,18 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     return HD_CALLBACK_CONTINUE;
 }
 
-//this function is run only once, and is responsible for starting the device/frames
-__declspec(dllexport) int start()
+/*** BEGIN LABVIEW FUNCTIONS ***/
+/*MAIN*/
+//Start & Stop Functions
+__declspec(dllexport) int start_haptic_loop(int input)
 {
+    // Mode switch
+        //0: Read mode
+        //1: STM Write mode
+        //2: AFM Write mode 
+    mode = input;
+    
+    // Main start function
     HDErrorInfo error;
     num_clicks = 0;
 
@@ -540,7 +381,7 @@ __declspec(dllexport) int start()
     HHD hHD = hdInitDevice(HD_DEFAULT_DEVICE);
     if (HD_DEVICE_ERROR(error = hdGetError()))
     {
-        //Failed to initialize haptic device
+        // Failed to initialize haptic device
         return -2;
     }
 
@@ -573,141 +414,163 @@ __declspec(dllexport) int start()
     hdDisableDevice(hHD);
     return 0;
 }
-
-//Positions: These map the position on the canvas to desired scope of the data
-__declspec(dllexport) double getposx() {
-    xf_last = xf_current;
-    xf_current = frac(fw_zoom, fw_nano) * x_nano + x0_nano;
-    return xf_current;
-}
-__declspec(dllexport) double getposz() {
-    zf_last = zf_current;
-    zf_current = frac(fh_zoom, fh_nano) * z_nano + z0_nano;
-    return zf_current;
-}
-__declspec(dllexport) double getposy(double shift) {
-    hduVector3Dd position;
-    hdGetDoublev(HD_CURRENT_POSITION, position);
-    return position[1] - shift;
+__declspec(dllexport) void stop_haptic_loop() {
+    num_clicks = 0;
+    HHD hHD = hdInitDevice(HD_DEFAULT_DEVICE);
+    HDCallbackCode hPlaneCallback = hdScheduleAsynchronous(
+        FrictionlessPlaneCallback, 0, HD_DEFAULT_SCHEDULER_PRIORITY);
+    hdStopScheduler();
+    hdUnschedule(hPlaneCallback);
+    hdDisableDevice(hHD);
 }
 
-__declspec(dllexport) double* pos_get(double shift) {
-    xf_last = xf_current;
-    xf_current = frac(fw_zoom, fw_nano) * x_nano + x0_nano;
-    zf_last = zf_current;
-    zf_current = frac(fh_zoom, fh_nano) * z_nano + z0_nano;
-    hduVector3Dd position;
-    hdGetDoublev(HD_CURRENT_POSITION, position);
-    double p[3] = { xf_current, zf_current, position[1] };
-    return p;
+//Position
+__declspec(dllexport) void position_get(double *output) {
+    output[0] = position[0];
+    output[1] = position[2];
+    output[2] = position[1];
+}
+__declspec(dllexport) void position_reframed_get(double* frame_properties, double* output) {   
+    double frame_center_nano[2] = { frame_properties[0], frame_properties[1] };
+    double frame_size_nano[2] = { frame_properties[2], frame_properties[3] };
+
+    double position_nano[2] = {position[0], position[2]};
+    if (wall_toggle) {
+        if (position[0] < frame_center_haptic[0] - frame_size_haptic[0] / 2) {
+            position_nano[0] = frame_center_haptic[0] - frame_size_haptic[0] / 2;
+        }
+        else if (position[0] > frame_center_haptic[0] + frame_size_haptic[0] / 2) {
+            position_nano[0] = frame_center_haptic[0] + frame_size_haptic[0] / 2;
+        }
+        if (position[2] < frame_center_haptic[1] - frame_size_haptic[1] / 2) {
+            position_nano[1] = frame_center_haptic[1] - frame_size_haptic[1] / 2;
+        }
+        else if (position[2] > frame_center_haptic[1] + frame_size_haptic[1] / 2) {
+            position_nano[1] = frame_center_haptic[1] + frame_size_haptic[1] / 2;
+        }
+    }
+
+    position_nano[0] = frame_size_nano[0] / frame_size_haptic[0] * (position_nano[0] - frame_center_haptic[0]) + frame_center_nano[0];
+    position_nano[1] = -1 * frame_size_nano[1] / frame_size_haptic[1] * (position_nano[1] - frame_center_haptic[1]) + frame_center_nano[1];
+
+    output[0] = position_nano[0];
+    output[1] = position_nano[1];
+    output[2] = position[1];
 }
 
-//Exports forces to LabView
-__declspec(dllexport) double getforcex() {
+//Velocity
+__declspec(dllexport) void velocity_get(double* output) {
+    output[0] = velocity[0];
+    output[1] = velocity[2];
+    output[2] = velocity[1];
+}
+__declspec(dllexport) void velocity_reframed_get(double* frame_properties, double* output) {
+    double frame_origin_nano[2] = { frame_properties[0], frame_properties[1] };
+    double frame_size_nano[2] = { frame_properties[2], frame_properties[3] };
+
+    output[0] = velocity[0] * frame_size_nano[0] / frame_size_haptic[0];
+    output[1] = -velocity[2] * frame_size_nano[1] / frame_size_haptic[1];
+    output[2] = velocity[1];
+}
+
+//Forces: Exports forces to LabView
+__declspec(dllexport) void forces_get(double* output) {
     hduVector3Dd force;
     hdGetDoublev(HD_CURRENT_FORCE, force);
-    return force[0];
+    output[0] = force[0];
+    output[1] = force[2];
+    output[2] = force[1];
 }
-__declspec(dllexport) double getforcey() {
-    hduVector3Dd force;
-    hduVector3Dd force_last;
-    hdGetDoublev(HD_CURRENT_FORCE, force);
-    hdGetDoublev(HD_LAST_FORCE, force_last);
-    if (force[1] == 0 && force_last[1] > 1) {
-        return force_last[1];
+__declspec(dllexport) void forces_set(double* input) {
+    force_labview[0] = input[0];
+    force_labview[1] = input[2];
+    force_labview[2] = input[1];
+}
+__declspec(dllexport) void drag_force_set(int* toggle, double* coeff) {
+    drag_toggle[0] = toggle[0];
+    drag_toggle[1] = toggle[2];
+    drag_toggle[2] = toggle[1];
+
+    k_drag[0] = coeff[0];
+    k_drag[1] = coeff[2];
+    k_drag[2] = coeff[1];
+}
+__declspec(dllexport) void force_extrema_set(double* maxforce, double* minforce) {
+    force_max[0] = maxforce[0];
+    force_max[1] = maxforce[2];
+    force_max[2] = maxforce[1];
+
+    force_min[0] = minforce[0];
+    force_min[1] = minforce[2];
+    force_min[2] = minforce[1];
+}
+
+//Angles: Exports angles to LabView
+__declspec(dllexport) void angles_get(double *output) {
+    hduVector3Dd angles;
+    hdGetDoublev(HD_CURRENT_GIMBAL_ANGLES, angles);
+    output[0] = angles[0];
+    output[1] = angles[1];
+    output[2] = angles[2];
+}
+
+//Button State
+__declspec(dllexport) int8_t buttonstate_get() {
+    HDint nCurrentButtons;
+    hdGetIntegerv(HD_CURRENT_BUTTONS, &nCurrentButtons);
+    return nCurrentButtons;
+}
+
+/*OTHER*/
+__declspec(dllexport) void safety_trigger(bool input, bool *output) {
+    if (input) {
+        safetip = input;
+        stop_haptic_loop();
+        *output = true;
     }
     else {
-        return force[1];
+        *output = false;
     }
-
 }
-__declspec(dllexport) double getforcez() {
-    hduVector3Dd force;
-    hdGetDoublev(HD_CURRENT_FORCE, force);
-    return force[2];
+__declspec(dllexport) void frame_wall_set(bool input, double k_wall) {
+    wall_toggle = input;
+    wall_stiffness = k_wall;
 }
-
-
-//Exports angles to LabView
-__declspec(dllexport) double gettheta() {
-    hduVector3Dd angles;
-    hdGetDoublev(HD_CURRENT_GIMBAL_ANGLES, angles);
-    return angles[0];
+__declspec(dllexport) void signal_input(double input_signal, double input_gain) {
+    signal = input_signal;
+    gain = input_gain;
 }
-__declspec(dllexport) double getphi() {
-    hduVector3Dd angles;
-    hdGetDoublev(HD_CURRENT_GIMBAL_ANGLES, angles);
-    return angles[1];
-}
-__declspec(dllexport) double getpsi() {
-    hduVector3Dd angles;
-    hdGetDoublev(HD_CURRENT_GIMBAL_ANGLES, angles);
-    return angles[2];
+__declspec(dllexport) void surface_force_set(double* input, double* output, int setting) {
+    surface_force = setting;
+    for (int i = 0; i < 4; i++) {
+        k[i] = output[i];
+    }
 }
 
-//Parameters from LabView
-__declspec(dllexport) void config(double ypos, int scopex, int scopez, int sizeofimgx, int sizeofimgz, double dragc, bool feedback, int forcemode) {
-    height_i = ypos;
-    fw_nano = sizeofimgx;
-    fh_nano = sizeofimgz;
-    fw_zoom = scopex;
-    fh_zoom = scopez;
-    scale_x = frac(fw_nano, fw_haptic);
-    scale_z = frac(fh_nano, fh_haptic);
-    dragc_x = dragc;
-    dragc_z = dragc_x;
-    feedbackmode = feedback;
-    forcesetting = forcemode;
-}
-__declspec(dllexport) void origin(double xorg, double zorg) {
-    x0_nano = xorg;
-    z0_nano = zorg;
-}
+//Planing Function
+__declspec(dllexport) int8_t planing(bool reset, bool planing, double zlabview, double* output) {
+    
+    
+    output[0] = normal[0];
+    output[1] = normal[2];
+    output[2] = normal[1];
+    output[3] = -1 * (normal[0] * point1[0] + normal[1] * point1[1] + normal[2] * point1[2]);
 
-//counts the number of clicks
-__declspec(dllexport) int clicks(bool reset, bool planing) {
+    planingdata_last = planingdata_current;
+    planingdata_current = zlabview;
+    posLV = { xf_last, planingdata_last, zf_last };
+
     if (reset) {
         num_clicks = 0;
     }
-    planingtoggle = planing;
-    int seq;
-    seq = num_clicks;
-    return seq;
+    planing_toggle = planing;
+    int8_t x = num_clicks;
+    return x;
 }
 
 
-//Imports position data from LabView (to allow flipping of data)
-__declspec(dllexport) void datain(double output) {
-    planingdata_last = planingdata_current;
-    planingdata_current = output;
-    posLV = { xf_last, planingdata_last, zf_last };
-}
 
-//Exports plane attributes to LabView
-__declspec(dllexport) double pd() {
-    return -1 * (normal[0] * point1[0] + normal[1] * point1[1] + normal[2] * point1[2]);
-}
-__declspec(dllexport) double pnx() {
-    return normal[0];
-}
-__declspec(dllexport) double pny() {
-    return normal[1];
-}
-__declspec(dllexport) double pnz() {
-    return normal[2];
-}
 
-__declspec(dllexport) double velx() {
-    return velocity[0] * scale_x * frac(fw_zoom, fw_nano);
-}
-
-__declspec(dllexport) double vely() {
-    return velocity[1];
-}
-
-__declspec(dllexport) double velz() {
-    return velocity[2] * scale_z * frac(fh_zoom, fh_nano);
-}
 __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin, int forcemode, bool afmmode) {
     afmtoggle = afmmode;
     if (afmmode == false) {
@@ -722,15 +585,7 @@ __declspec(dllexport) void getcurrent(double currentin, double maxforcey, double
     force_y_min = minforcey;
     current_setpoint = fabs(setpoint);
     current_max = maxcurrentin;
-    forcesetting = forcemode;
-}
-
-__declspec(dllexport) void forceconfig(double a, double b, double c, double spc) {
-    k_a = a;
-    k_b = b;
-    k_c = c;
-    spc_percent = spc;
-
+    surface_force = forcemode;
 }
 
 __declspec(dllexport) double yrescale(double ylabview, double scalingfactor, double surf, double plunge) {
@@ -743,7 +598,7 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor, dou
     ylabview_current = ylabview;
 
     if (afmtoggle == false) {
-        switch (forcesetting) {
+        switch (surface_force) {
         case 0: //Exponential Scaling
             if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
                 Zthresh = ylabview;
@@ -752,7 +607,7 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor, dou
                 youtput = ylabview;
             }
             else {
-                youtput = frac(1, k_c * 20) * (exp(k_c * 20 * (ylabview - Zthresh)) - 1) + Zthresh;
+                youtput = (1 / (k_c * 20)) * (exp(k_c * 20 * (ylabview - Zthresh)) - 1) + Zthresh;
             }
             if (youtput >= ylabview && ylabview >= Zthresh) {
                 youtput = ylabview;
@@ -781,7 +636,7 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor, dou
                 youtput = ylabview;
             }
             else {
-                youtput = frac(1, k_c * 20) * (exp(k_c * 20 * (ylabview - Zthresh)) - 1) + Zthresh;
+                youtput = (1 / (k_c * 20)) * (exp(k_c * 20 * (ylabview - Zthresh)) - 1) + Zthresh;
             }
             if (youtput >= ylabview && ylabview >= Zthresh) {
                 youtput = ylabview;
@@ -803,19 +658,11 @@ __declspec(dllexport) double yrescale(double ylabview, double scalingfactor, dou
     else {
         return youtput;
     }
-
-}
-
-__declspec(dllexport) double threshhold() {
-    return Zthresh;
-}
-
-__declspec(dllexport) int buttonstate() {
-    return button_state;
 }
 
 __declspec(dllexport) double zlimit(double yscaledinput) {
-    yscaled_last = yscaled_current;
+    double yscaled_current = 75;
+    double yscaled_last = yscaled_current;
     yscaled_current = yscaledinput;
 
     if (current_current >= current_max && current_last < current_max) {
@@ -838,19 +685,4 @@ __declspec(dllexport) double zslower(double nanonis_zpos_read, double labview_zp
         newzpos = labview_zpos_write;
     }
     return newzpos;
-}
-
-__declspec(dllexport) void safetiptrigger(bool triggered) {
-    safetip = triggered;
-}
-
-//Shuts down device
-__declspec(dllexport) void shutdown() {
-    num_clicks = 0;
-    HHD hHD = hdInitDevice(HD_DEFAULT_DEVICE);
-    HDCallbackCode hPlaneCallback = hdScheduleAsynchronous(
-        FrictionlessPlaneCallback, 0, HD_DEFAULT_SCHEDULER_PRIORITY);
-    hdStopScheduler();
-    hdUnschedule(hPlaneCallback);
-    hdDisableDevice(hHD);
 }
