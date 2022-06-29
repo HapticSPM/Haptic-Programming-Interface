@@ -3,7 +3,7 @@
 #include <utility>
 #include <limits.h>
 #include <ctime>
-#include "HapticSPM.h"
+#include "HapticSPM.h" // where exported functions are declared
 
 #ifdef  _WIN64
 #pragma warning (disable:4996)
@@ -21,11 +21,6 @@
 #include <HDU/hduError.h>
 
 
-#include <string>
-#include <iostream>
-#include <Windows.h>
-#include <vector>
-
 /***** BEGIN GLOBAL VARIABLES *****/
 /*** HAPTIC FRAME PROPERTIES ***/
 //Frame origin, the bottom left corner of the haptic workspace (in units of mm), the area in which the pen is bounded.
@@ -33,11 +28,14 @@ const double frame_center_haptic[2] = { 0 , 20 };
 //The frame width and frame height of the haptic workspace (in units of mm).
 const double frame_size_haptic[2] = { 120 , 120 };
 
-int mode = 0;
+/*** HAPTIC DEVICE PROPERTIES ***/
+hduVector3Dd position; //units of mm
+hduVector3Dd velocity; //units of mm/s
 
-hduVector3Dd position;
-hduVector3Dd velocity;
+/*** OTHER ***/
 hduVector3Dd force_labview;
+
+int mode = 0;
 
 bool wall_toggle = false;
 double wall_stiffness = 0.2;
@@ -143,10 +141,12 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     case 2: //Write Mode
         switch (surface_force) {
         case 0: //Log Force
-            if (gain * signal) {
-            
+            if (gain * signal <= k[2] * pow(10,-12)) {
+                force[1] = 0;
             }
-                
+            else {
+                force[1] = 4 * log(gain * signal / k[2]);
+            }
                 //force[1] = k[0] * 2.48218 * std::log(k[1] * (1 / k[2]) * gain * signal + 1);
             break;
         case 1: //Linear Force
@@ -450,7 +450,7 @@ __declspec(dllexport) int8_t buttonstate_get() {
     return nCurrentButtons;
 }
 
-/*OTHER*/
+/*** OTHER ***/
 __declspec(dllexport) void safety_trigger(bool input, bool *output) {
     if (input) {
         safetip = input;
@@ -469,10 +469,10 @@ __declspec(dllexport) void signal_input(double input_signal, double input_gain) 
     signal = input_signal;
     gain = input_gain;
 }
-__declspec(dllexport) void surface_force_set(double* input, double* output, int setting) {
+__declspec(dllexport) void surface_force_set(double* input, int setting) {
     surface_force = setting;
     for (int i = 0; i < 4; i++) {
-        k[i] = output[i];
+        k[i] = input[i];
     }
 }
 __declspec(dllexport) int8_t planing_set(bool reset, bool toggle) {
