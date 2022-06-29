@@ -27,9 +27,6 @@
 #include <vector>
 
 /***** BEGIN GLOBAL VARIABLES *****/
-
-
-
 /*** HAPTIC FRAME PROPERTIES ***/
 //Frame origin, the bottom left corner of the haptic workspace (in units of mm), the area in which the pen is bounded.
 const double frame_center_haptic[2] = { 0 , 20 };
@@ -60,82 +57,18 @@ int surface_force = 0;
 
 bool safetip = false;
 
-
-/*** FEEDBACK MODE ***/
-/* Note: "Feedback mode" corresponds to the mode in which the haptic pen controls the x - y position in nanonis but not the z position.
-   The STM is left tunneling, the z position is read and converted to a force. "Raw" or "Feedbackless" mode is the mode in which all
-   positions of the haptic pen (x, y, z) control the STM tip. The STM tunneling is turned off, and the tunneling current is converted
-   to a force in the y direction. */
-//The initial height of the plane from LabView before the planing.
-double height_i = 20;
-//The height of the plane based on the input data from nanonis (i.e. how the features are felt).
-double h_nano = 20;
-
-/*** CURRENT ***/
-//Setpoint Current, set in nanonis, roughly determines the current (pA) at which the force is neutral.
-double current_setpoint = 100;
-//Maximum current is maximum allowed current (pA) before the safety mechanisms kick in
-double current_max = 10000;
-//Live input current
-double current_current = 0;
-double current_last = 0;
-//The percent of the setpointcurrent which triggers Zthresh
-double spc_percent = 0.50;
-//Minimum current it takes to write a force
-double mincurrent = 0;
-//Safetip, true if the tip exhibits dangerous behavior
-
-bool afmtoggle = false;
-
-
-
-/*** FORCE PARAMETERS ***/
-//Sets the drag coefficients.
-
-
-
-//The force component in each direction.
-
-//force_y limits.
-double force_y_max = 2.485;
-double force_y_min = 0.275;
-//dragless force_y numbers
-double force_y_nodrag_current;
-double force_y_nodrag_last;
-//determines force scaling
-
-//Scaling factors
-double k_a = 1;
-double k_b = 1;
-double k_c = 1;
-
-
-
-/*** PLANING SEQUENCE ***/
-//Number of clicks for planing, 3 is necessary before the plane becomes 'active'. 
-//A click is triggered by experiencing a sufficient level of downward force.
 int num_clicks = 0;
-//Planing toggle
 bool planing_toggle = false;
-//Frame count used for delay
-int frames = 0;
-//Wait after each click
-int wait;
-//Normal vector & points for plane
-hduVector3Dd normal;
-hduVector3Dd point1, point2, point3;
-//This calculates plane attributes
-void plane() {
-    hduVector3Dd a = point2 - point1;
-    hduVector3Dd b = point3 - point1;
-    normal = -1 * a.crossProduct(b);
-    if (normal[1] < 0) {
-        normal = -1 * normal;
-    }
-}
-//Ouput value from LabView data, this is the y value used for planing
-double planingdata_current = 0;
-double planingdata_last = 0;
+
+struct {
+    bool toggle = false;
+    bool active = false;
+} planing;
+
+struct {
+    hduVector3Dd n;
+    double d = 0;
+} planeProperties;
 
 double lin(double xv) {
     if (std::pow(10, 8) * xv >= 1) {
@@ -147,40 +80,16 @@ double lin(double xv) {
 }
 
 
-/*** SCALED Y ***/
-//Y position from the scaling done in labview (in units of nm)
-
-
-/*** POSITIONS ***/
-//Final positions being sent to Labview
-double xf_current = 0;
-double xf_last = 0;
-double zf_current = 0;
-double zf_last = 0;
-//input position from LabView (to make flipping data easier)
-hduVector3Dd posLV;
-//input y position from LabView BEFORE the scaling function has been applied (raw y from labview in units of nm, doesn't slow down at Zthresh)
-std::vector<double> ylabview_last(10);
-double ylabview_current = 0;
-//The threshold Z at which the pen position starts scaling (decreasing the distance it travels)
-double Zthresh = 0;
-std::string Zthresh_data;
-//The maximum Z at which the current has exceeded the maximum current
-double Zmax = 0;
-double yk = 1;
-
-
 
 /*** HAPTIC CALLBACK ***/
 //This is where the arm code is run and the forces are written.
 HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 {
     hdEnable(HD_MAX_FORCE_CLAMPING);
-
-    const double planeStiffness = 0.35;
     const double time_interval = 2;
     time_t time_initial = time(NULL);
-    const double forcetrigger = 2;
+    const double force_trigger = 2;
+    hduVector3Dd plane_points[3];
 
     hduVector3Dd force;
 
@@ -196,22 +105,31 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         break;
     case 1: //Read Mode
         if (position[1] <= gain * signal) {
-            double penetrationDistance = fabs(position[1] - gain * signal);
+            double penetrationDistance;
+            if (planing.toggle && planing.active) {
+                double h;
+                h = (planeProperties.n[0]*position[0] + planeProperties.n[1] * position[1] + planeProperties.n[2] * position[2] + planeProperties.d) / sqrt(pow(planeProperties.n[0],2)+ pow(planeProperties.n[1], 2)+ pow(planeProperties.n[2], 2));
+                penetrationDistance = fabs(position[1] - h - gain * signal);
+            }
+            else {
+                penetrationDistance = fabs(position[1] - gain * signal);
+            }
+            
             switch (surface_force) {
             case 0: //Linear Force
                 force[1] = k[0] * penetrationDistance;
                 break;
             case 1: //Coulomb
-                force[1] = k[0] * 0.7 / std::pow(penetrationDistance / -15 + 2.17, 2) - 0.12;
+                force[1] = k[0] * 0.7 / pow(penetrationDistance / -15 + 2.17, 2) - 0.12;
                 break;
             case 2: //Lennard-Jones Force
-                force[1] = k[0] * -4.0 * 0.5 * (6 / std::pow(penetrationDistance / -30 + 2.05, 7) - 12 / std::pow(penetrationDistance / -30 + 2.05, 13));
+                force[1] = k[0] * -4.0 * 0.5 * (6 / pow(penetrationDistance / -30 + 2.05, 7) - 12 / pow(penetrationDistance / -30 + 2.05, 13));
                 break;
             case 3: //Van der Waals Force
-                force[1] = k[0] * 1 / std::pow(penetrationDistance / -15 + 1.84, 7);
+                force[1] = k[0] * 1 / pow(penetrationDistance / -15 + 1.84, 7);
                 break;
             case 4: //Exponential
-                force[1] = k[0] * std::pow(2.71828, 0.1 * penetrationDistance - 2) - 0.1;
+                force[1] = k[0] * pow(2.71828, 0.1 * penetrationDistance - 2) - 0.1;
                 break;
             default: //Linear
                 force[1] = k[0] * penetrationDistance;
@@ -225,7 +143,11 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     case 2: //Write Mode
         switch (surface_force) {
         case 0: //Log Force
-            force[1] = k[0] * 2.48218 * std::log(k[1] * (1 / k[2]) * gain * signal + 1);
+            if (gain * signal) {
+            
+            }
+                
+                //force[1] = k[0] * 2.48218 * std::log(k[1] * (1 / k[2]) * gain * signal + 1);
             break;
         case 1: //Linear Force
             force[1] = k[0] * gain * signal;
@@ -313,36 +235,27 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         hdSetDoublev(HD_CURRENT_FORCE, zeroforce);
     }
 
-    //handles the sequence of choosing points on a plane
-
-    if (num_clicks <= 2 && frames == wait && planing_toggle) {
-        h_nano = height_i;
-        if ((force_y_nodrag_current <= forcetrigger) && (force_y_nodrag_last >= forcetrigger)) {
-            frames = 0;
-            if (num_clicks == 0) {
-                point1 = posLV;
-                num_clicks++;
+    //Handles the sequence of choosing points to plane
+    if (num_clicks <= 2 && planing_toggle) {
+        time_t time_current = time(NULL);
+        if (time_current - time_initial >= 2 && force[1] >= force_trigger) {
+            time_initial = time_current;
+            plane_points[num_clicks] = position;
+            if (num_clicks == 2) {
+                hduVector3Dd a = plane_points[1] - plane_points[0];
+                hduVector3Dd b = plane_points[2] - plane_points[1];
+                hduVector3Dd normal = -1 * a.crossProduct(b);
+                if (normal[1] < 0) {
+                    normal = -1 * normal;
+                }
+                planeProperties.n = normal;
+                planeProperties.d = -1 * (normal[0] * plane_points[0][0] + normal[1] * plane_points[0][1] + normal[2] * plane_points[0][2]);
             }
-            else if (num_clicks == 1) {
-                point2 = posLV;
-
-                //if statement here
-                num_clicks++;
-            }
-            else {
-                point3 = posLV;
-                num_clicks++;
-                plane();
-                frames = 0;
-            }
+            num_clicks++;
         }
     }
-    else {
-        h_nano = height_i;
-    }
-
-    if (frames < wait && num_clicks < 3) {
-        frames++;
+    else if (num_clicks == 3 && position[1] >= 80 && planing.active == false) {
+        planing.active = true;
     }
 
     hdEndFrame(hdGetCurrentDevice());
@@ -424,38 +337,54 @@ __declspec(dllexport) void stop_haptic_loop() {
     hdDisableDevice(hHD);
 }
 
+/*** PEN PROPERTIES ***/
 //Position
 __declspec(dllexport) void position_get(double *output) {
     output[0] = position[0];
     output[1] = position[2];
     output[2] = position[1];
 }
-__declspec(dllexport) void position_reframed_get(double* frame_properties, double* output) {   
+__declspec(dllexport) void position_reframed_get(double* frame_properties, bool zscaling, double surface_location, double pos_gain, double* output) {   
     double frame_center_nano[2] = { frame_properties[0], frame_properties[1] };
     double frame_size_nano[2] = { frame_properties[2], frame_properties[3] };
 
-    double position_nano[2] = {position[0], position[2]};
-    if (wall_toggle) {
-        if (position[0] < frame_center_haptic[0] - frame_size_haptic[0] / 2) {
-            position_nano[0] = frame_center_haptic[0] - frame_size_haptic[0] / 2;
+    double positionReframed[3] = {position[0], position[2], position[1]};
+
+    //planing
+    if (planing.toggle && num_clicks == 2 && planing.active) {
+        if (mode == 2) {
+            positionReframed[2] = positionReframed[2] + -1 * (planeProperties.d + planeProperties.n[0] * positionReframed[0] + planeProperties.n[1]*positionReframed[1]) / planeProperties.n[2];
         }
-        else if (position[0] > frame_center_haptic[0] + frame_size_haptic[0] / 2) {
-            position_nano[0] = frame_center_haptic[0] + frame_size_haptic[0] / 2;
-        }
-        if (position[2] < frame_center_haptic[1] - frame_size_haptic[1] / 2) {
-            position_nano[1] = frame_center_haptic[1] - frame_size_haptic[1] / 2;
-        }
-        else if (position[2] > frame_center_haptic[1] + frame_size_haptic[1] / 2) {
-            position_nano[1] = frame_center_haptic[1] + frame_size_haptic[1] / 2;
+        else {
+            positionReframed[2] = 79 * pow(10, -9);
         }
     }
 
-    position_nano[0] = frame_size_nano[0] / frame_size_haptic[0] * (position_nano[0] - frame_center_haptic[0]) + frame_center_nano[0];
-    position_nano[1] = -1 * frame_size_nano[1] / frame_size_haptic[1] * (position_nano[1] - frame_center_haptic[1]) + frame_center_nano[1];
+    if (wall_toggle) {
+        for (int i = 0; i < 2; i++) {
+            if (positionReframed[i] < frame_center_haptic[i] - frame_size_haptic[i] / 2) {
+                positionReframed[i] = frame_center_haptic[i] - frame_size_haptic[i] / 2;
+            }
+            else if (positionReframed[i] > frame_center_haptic[i] + frame_size_haptic[i] / 2) {
+                positionReframed[i] = frame_center_haptic[i] + frame_size_haptic[i] / 2;
+            }
+        }
+    }
+    positionReframed[0] = frame_size_nano[0] / frame_size_haptic[0] * (positionReframed[0] - frame_center_haptic[0]) + frame_center_nano[0];
+    positionReframed[1] = -1 * frame_size_nano[1] / frame_size_haptic[1] * (positionReframed[1] - frame_center_haptic[1]) + frame_center_nano[1];
 
-    output[0] = position_nano[0];
-    output[1] = position_nano[1];
-    output[2] = position[1];
+    //zscaling
+    if (zscaling) {
+        //puts floor at -50 mm down (remove if unnecessary)
+        if (positionReframed[2] < -50) {
+            positionReframed[2] = -50;
+        }
+        positionReframed[2] = 1 / pos_gain * std::pow(10, -12) * positionReframed[2] + surface_location;
+    }
+
+    output[0] = positionReframed[0];
+    output[1] = positionReframed[1];
+    output[2] = positionReframed[2];
 }
 
 //Velocity
@@ -473,7 +402,7 @@ __declspec(dllexport) void velocity_reframed_get(double* frame_properties, doubl
     output[2] = velocity[1];
 }
 
-//Forces: Exports forces to LabView
+//Forces
 __declspec(dllexport) void forces_get(double* output) {
     hduVector3Dd force;
     hdGetDoublev(HD_CURRENT_FORCE, force);
@@ -505,7 +434,7 @@ __declspec(dllexport) void force_extrema_set(double* maxforce, double* minforce)
     force_min[2] = minforce[1];
 }
 
-//Angles: Exports angles to LabView
+//Angles
 __declspec(dllexport) void angles_get(double *output) {
     hduVector3Dd angles;
     hdGetDoublev(HD_CURRENT_GIMBAL_ANGLES, angles);
@@ -546,143 +475,12 @@ __declspec(dllexport) void surface_force_set(double* input, double* output, int 
         k[i] = output[i];
     }
 }
-
-//Planing Function
-__declspec(dllexport) int8_t planing(bool reset, bool planing, double zlabview, double* output) {
-    
-    
-    output[0] = normal[0];
-    output[1] = normal[2];
-    output[2] = normal[1];
-    output[3] = -1 * (normal[0] * point1[0] + normal[1] * point1[1] + normal[2] * point1[2]);
-
-    planingdata_last = planingdata_current;
-    planingdata_current = zlabview;
-    posLV = { xf_last, planingdata_last, zf_last };
-
+__declspec(dllexport) int8_t planing_set(bool reset, bool toggle) {
     if (reset) {
         num_clicks = 0;
+        planing.active = false;
     }
-    planing_toggle = planing;
+    planing.toggle = toggle;
     int8_t x = num_clicks;
     return x;
-}
-
-
-
-
-__declspec(dllexport) void getcurrent(double currentin, double maxforcey, double minforcey, double setpoint, double maxcurrentin, int forcemode, bool afmmode) {
-    afmtoggle = afmmode;
-    if (afmmode == false) {
-        current_last = fabs(current_current);
-        current_current = fabs(currentin);
-    }
-    else {
-        current_last = current_current;
-        current_current = currentin;
-    }
-    force_y_max = maxforcey;
-    force_y_min = minforcey;
-    current_setpoint = fabs(setpoint);
-    current_max = maxcurrentin;
-    surface_force = forcemode;
-}
-
-__declspec(dllexport) double yrescale(double ylabview, double scalingfactor, double surf, double plunge) {
-    double youtput;
-    const double c_yscaling = 0.1;
-    for (long long int i = ylabview_last.size(); i > 1; i--) {
-        ylabview_last[i - 1] = ylabview_last[i - 2];
-    }
-    ylabview_last[0] = ylabview_current;
-    ylabview_current = ylabview;
-
-    if (afmtoggle == false) {
-        switch (surface_force) {
-        case 0: //Exponential Scaling
-            if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-                Zthresh = ylabview;
-            }
-            if (current_current <= spc_percent * current_setpoint) {
-                youtput = ylabview;
-            }
-            else {
-                youtput = (1 / (k_c * 20)) * (exp(k_c * 20 * (ylabview - Zthresh)) - 1) + Zthresh;
-            }
-            if (youtput >= ylabview && ylabview >= Zthresh) {
-                youtput = ylabview;
-            }
-
-            break;
-        case 1: //Linear Scaling
-            if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-                Zthresh = ylabview_current;
-            }
-            if (current_current <= spc_percent * current_setpoint) {
-                youtput = ylabview;
-            }
-            else {
-                youtput = c_yscaling * (ylabview - Zthresh) + Zthresh;
-                if (youtput < ylabview) {
-                    youtput = ylabview;
-                }
-            }
-            break;
-        default://Exponential
-            if (current_current >= spc_percent * current_setpoint && current_last < spc_percent * current_setpoint) {
-                Zthresh = ylabview;
-            }
-            if (current_current <= spc_percent * current_setpoint) {
-                youtput = ylabview;
-            }
-            else {
-                youtput = (1 / (k_c * 20)) * (exp(k_c * 20 * (ylabview - Zthresh)) - 1) + Zthresh;
-            }
-            if (youtput >= ylabview && ylabview >= Zthresh) {
-                youtput = ylabview;
-            }
-        }
-    }
-    else {//AFM scaling
-        if (ylabview >= surf) {
-            youtput = ylabview;
-        }
-        else {
-            youtput = plunge * exp(1 / plunge * (ylabview - surf)) - plunge + surf;
-        }
-    }
-
-    if (youtput > 10000) {
-        return ylabview;
-    }
-    else {
-        return youtput;
-    }
-}
-
-__declspec(dllexport) double zlimit(double yscaledinput) {
-    double yscaled_current = 75;
-    double yscaled_last = yscaled_current;
-    yscaled_current = yscaledinput;
-
-    if (current_current >= current_max && current_last < current_max) {
-        Zmax = yscaled_last;
-    }
-    return Zmax;
-}
-
-__declspec(dllexport) double zslower(double nanonis_zpos_read, double labview_zpos_write, double maxvel) {
-    maxvel = maxvel * 0.001; //nm per millisecond to nm to second
-    double newzpos;
-    if (labview_zpos_write - nanonis_zpos_read >= maxvel) {
-        newzpos = nanonis_zpos_read + maxvel;
-    }
-    else if (nanonis_zpos_read - labview_zpos_write >= maxvel)
-    {
-        newzpos = nanonis_zpos_read - maxvel;
-    }
-    else {
-        newzpos = labview_zpos_write;
-    }
-    return newzpos;
 }
