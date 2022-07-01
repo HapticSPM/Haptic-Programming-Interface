@@ -22,11 +22,11 @@
 
 
 /***** BEGIN GLOBAL VARIABLES *****/
-/*** HAPTIC FRAME PROPERTIES ***/
-//Frame origin, the bottom left corner of the haptic workspace (in units of mm), the area in which the pen is bounded.
-const double frame_center_haptic[2] = { 0 , 20 };
-//The frame width and frame height of the haptic workspace (in units of mm).
-const double frame_size_haptic[2] = { 120 , 120 };
+/*** HAPTIC FRAME PROPERTIES ***/ 
+struct {
+    const double center[2] = { 0 , 20 };
+    const double size[2] = { 120, 120 };
+} frame_haptic;
 
 /*** HAPTIC DEVICE PROPERTIES ***/
 hduVector3Dd position; //units of mm
@@ -34,10 +34,9 @@ hduVector3Dd velocity; //units of mm/s
 
 /*** OTHER ***/
 hduVector3Dd force_labview;
-
 int mode = 0;
 
-bool wall_toggle = false;
+bool wall_toggle = true;
 double wall_stiffness = 0.2;
 
 bool drag_toggle[3] = {false, false, false};
@@ -56,7 +55,8 @@ int surface_force = 0;
 bool safetip = false;
 
 int num_clicks = 0;
-bool planing_toggle = false;
+
+time_t time_initial = time(NULL);
 
 struct {
     bool toggle = false;
@@ -85,7 +85,6 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 {
     hdEnable(HD_MAX_FORCE_CLAMPING);
     const double time_interval = 2;
-    time_t time_initial = time(NULL);
     const double force_trigger = 2;
     hduVector3Dd plane_points[3];
 
@@ -95,6 +94,40 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 
     hdGetDoublev(HD_CURRENT_POSITION, position);
     hdGetDoublev(HD_CURRENT_VELOCITY, velocity);
+
+    //Calculate xy forces & drag forces
+    if (wall_toggle) {
+        if (position[0] < frame_haptic.center[0] - frame_haptic.size[0] / 2) {
+            force[0] = wall_stiffness * (frame_haptic.center[0] - frame_haptic.size[0] / 2 - position[0]);
+        }
+        else if (position[0] > frame_haptic.center[0] + frame_haptic.size[0] / 2) {
+            force[0] = (frame_haptic.center[0] + frame_haptic.size[0] / 2 - position[0]);
+        }
+        else if (drag_toggle[0]) {
+            force[0] = -1 * k_drag[0] * velocity[0];
+        }
+
+        if (position[2] < frame_haptic.center[1] - frame_haptic.size[1] / 2) {
+            force[2] = wall_stiffness * (frame_haptic.center[1] - frame_haptic.size[1] / 2 - position[2]);
+        }
+        else if (position[2] > frame_haptic.center[1] + frame_haptic.size[1] / 2) {
+            force[2] = wall_stiffness * (frame_haptic.center[1] + frame_haptic.size[1] / 2 - position[2]);
+        }
+        else if (drag_toggle[2]) {
+            force[2] = -1 * k_drag[2] * velocity[2] + force[2];
+        }
+
+        if (drag_toggle[1]) {
+            force[1] = -1 * k_drag[1] * velocity[1] + force[1];
+        }
+    }
+    else {
+        for (int i = 0; i < 3; i++) {
+            if (drag_toggle[i]) {
+                force[i] = -1 * k_drag[i] * velocity[i] + force[i];
+            }
+        }
+    }
 
     //Calculate z force
     switch (mode) {
@@ -141,11 +174,11 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     case 2: //Write Mode
         switch (surface_force) {
         case 0: //Log Force
-            if (gain * signal <= k[2] * pow(10,-12)) {
+            if (gain * signal <= k[1]) {
                 force[1] = 0;
             }
             else {
-                force[1] = 4 * log(gain * signal / k[2]);
+                force[1] = k[0] * 4 * log(gain * signal / k[1]);
             }
                 //force[1] = k[0] * 2.48218 * std::log(k[1] * (1 / k[2]) * gain * signal + 1);
             break;
@@ -182,40 +215,6 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         break;
     }
 
-    //Calculate xy forces & drag forces
-    if (wall_toggle) {
-        if (position[0] < frame_center_haptic[0] - frame_size_haptic[0] / 2) {
-            force[0] = wall_stiffness * (frame_center_haptic[0] - frame_size_haptic[0] / 2 - position[0]) + force[0];
-        }
-        else if (position[0] > frame_center_haptic[0] + frame_size_haptic[0] / 2) {
-            force[0] = (frame_center_haptic[0] + frame_size_haptic[0] / 2 - position[0]) + force[0];
-        }
-        else if (drag_toggle[0]){
-            force[0] = -1 * k_drag[0] * velocity[0] + force[0];
-        }
-
-        if (position[2] < frame_center_haptic[1] - frame_size_haptic[1] / 2) {
-            force[2] = wall_stiffness * (frame_center_haptic[1] - frame_size_haptic[1] / 2 - position[2]) + force[2];
-        }
-        else if (position[2] > frame_center_haptic[1] + frame_size_haptic[1] / 2) {
-            force[2] = wall_stiffness * (frame_center_haptic[1] + frame_size_haptic[1] / 2 - position[2]) + force[2];
-        }
-        else if (drag_toggle[2]) {
-            force[2] = -1 * k_drag[2] * velocity[2] + force[2];
-        }
-
-        if (drag_toggle[1]) {
-            force[1] = -1 * k_drag[1] * velocity[1] + force[1];
-        }
-    } 
-    else {
-        for (int i = 0; i < 3; i++) {
-            if (drag_toggle[i]) {
-                force[i] = -1 * k_drag[i] * velocity[i] + force[i];
-            }
-        }
-    }
-
     //Checks if the calculated forces are within the range of acceptable forces, and, if not, coerces them to within the range.
     for (int i = 0; i < 3; i++) {
         if (force[i] > force_max[i]) {
@@ -236,7 +235,8 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     }
 
     //Handles the sequence of choosing points to plane
-    if (num_clicks <= 2 && planing_toggle) {
+
+    if (num_clicks <= 2 && planing.toggle == true) {
         time_t time_current = time(NULL);
         if (time_current - time_initial >= 2 && force[1] >= force_trigger) {
             time_initial = time_current;
@@ -362,16 +362,16 @@ __declspec(dllexport) void position_reframed_get(double* frame_properties, bool 
 
     if (wall_toggle) {
         for (int i = 0; i < 2; i++) {
-            if (positionReframed[i] < frame_center_haptic[i] - frame_size_haptic[i] / 2) {
-                positionReframed[i] = frame_center_haptic[i] - frame_size_haptic[i] / 2;
+            if (positionReframed[i] < frame_haptic.center[i] - frame_haptic.size[i] / 2) {
+                positionReframed[i] = frame_haptic.center[i] - frame_haptic.size[i] / 2;
             }
-            else if (positionReframed[i] > frame_center_haptic[i] + frame_size_haptic[i] / 2) {
-                positionReframed[i] = frame_center_haptic[i] + frame_size_haptic[i] / 2;
+            else if (positionReframed[i] > frame_haptic.center[i] + frame_haptic.size[i] / 2) {
+                positionReframed[i] = frame_haptic.center[i] + frame_haptic.size[i] / 2;
             }
         }
     }
-    positionReframed[0] = frame_size_nano[0] / frame_size_haptic[0] * (positionReframed[0] - frame_center_haptic[0]) + frame_center_nano[0];
-    positionReframed[1] = -1 * frame_size_nano[1] / frame_size_haptic[1] * (positionReframed[1] - frame_center_haptic[1]) + frame_center_nano[1];
+    positionReframed[0] = frame_size_nano[0] / frame_haptic.size[0] * (positionReframed[0] - frame_haptic.center[0]) + frame_center_nano[0];
+    positionReframed[1] = -1 * frame_size_nano[1] / frame_haptic.size[1] * (positionReframed[1] - frame_haptic.center[1]) + frame_center_nano[1];
 
     //zscaling
     if (zscaling) {
@@ -397,8 +397,8 @@ __declspec(dllexport) void velocity_reframed_get(double* frame_properties, doubl
     double frame_origin_nano[2] = { frame_properties[0], frame_properties[1] };
     double frame_size_nano[2] = { frame_properties[2], frame_properties[3] };
 
-    output[0] = velocity[0] * frame_size_nano[0] / frame_size_haptic[0];
-    output[1] = -velocity[2] * frame_size_nano[1] / frame_size_haptic[1];
+    output[0] = velocity[0] * frame_size_nano[0] / frame_haptic.size[0];
+    output[1] = -velocity[2] * frame_size_nano[1] / frame_haptic.size[1];
     output[2] = velocity[1];
 }
 
@@ -480,7 +480,7 @@ __declspec(dllexport) int8_t planing_set(bool reset, bool toggle) {
         num_clicks = 0;
         planing.active = false;
     }
-    planing.toggle = toggle;
+    planing.toggle = toggle;    time_t time_current = time(NULL);
     int8_t x = num_clicks;
     return x;
 }
