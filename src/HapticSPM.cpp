@@ -56,6 +56,8 @@ bool safetip = false;
 
 int num_clicks = 0;
 
+double test = 0;
+
 time_t time_initial = time(NULL);
 
 struct {
@@ -64,7 +66,7 @@ struct {
 } planing;
 
 struct {
-    hduVector3Dd n;
+    hduVector3Dd n = { 0, 0, 0 };
     double d = 0;
 } planeProperties;
 
@@ -77,7 +79,7 @@ double lin(double xv) {
     }
 }
 
-
+hduVector3Dd plane_points[3];
 
 /*** HAPTIC CALLBACK ***/
 //This is where the arm code is run and the forces are written.
@@ -86,7 +88,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     hdEnable(HD_MAX_FORCE_CLAMPING);
     const double time_interval = 2;
     const double force_trigger = 2;
-    hduVector3Dd plane_points[3];
+    
 
     hduVector3Dd force;
 
@@ -135,16 +137,17 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         force = force_labview;
         break;
     case 1: //Read Mode
-        if (position[1] <= gain * signal) {
+        double signal_planed;
+        if (planing.active && planing.toggle && mode == 1) {
+            signal_planed = signal + (planeProperties.d + planeProperties.n[0] * position[0] + planeProperties.n[1] * position[2]) / planeProperties.n[2];
+        }
+        else {
+            signal_planed = signal;
+        }
+
+        if (position[1] <= gain * signal_planed) {
             double penetrationDistance;
-            if (planing.toggle && planing.active) {
-                double h;
-                h = (planeProperties.n[0]*position[0] + planeProperties.n[1] * position[1] + planeProperties.n[2] * position[2] + planeProperties.d) / sqrt(pow(planeProperties.n[0],2)+ pow(planeProperties.n[1], 2)+ pow(planeProperties.n[2], 2));
-                penetrationDistance = fabs(position[1] - h - gain * signal);
-            }
-            else {
-                penetrationDistance = fabs(position[1] - gain * signal);
-            }
+            penetrationDistance = fabs(position[1] - gain * signal_planed);
             
             switch (surface_force) {
             case 0: //Linear Force
@@ -240,21 +243,32 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         time_t time_current = time(NULL);
         if (time_current - time_initial >= 2 && force[1] >= force_trigger) {
             time_initial = time_current;
-            plane_points[num_clicks] = position;
+            switch (mode) {
+            case 1:
+                plane_points[num_clicks] = { position[0], position[2], signal };
+                break;
+            case 2:
+                plane_points[num_clicks] = { position[0], position[2], position[1] };
+                break;
+            default:
+                plane_points[num_clicks] = { position[0], position[2], position[1] };
+                break;
+            }
+            
             if (num_clicks == 2) {
                 hduVector3Dd a = plane_points[1] - plane_points[0];
                 hduVector3Dd b = plane_points[2] - plane_points[1];
                 hduVector3Dd normal = -1 * a.crossProduct(b);
-                if (normal[1] < 0) {
+                if (normal[2] < 0) {
                     normal = -1 * normal;
                 }
                 planeProperties.n = normal;
-                planeProperties.d = -1 * (normal[0] * plane_points[0][0] + normal[1] * plane_points[0][1] + normal[2] * plane_points[0][2]);
+                planeProperties.d = -1 * normal.dotProduct(plane_points[0]);
             }
             num_clicks++;
         }
     }
-    else if (num_clicks == 3 && position[1] >= 80 && planing.active == false) {
+    if (num_clicks == 3 && position[1] >= 80 && planing.active == false) {
         planing.active = true;
     }
 
@@ -354,8 +368,7 @@ __declspec(dllexport) void position_reframed_get(double* frame_properties, bool 
     if (planing.toggle && num_clicks == 2 && planing.active) {
         if (mode == 2) {
             positionReframed[2] = positionReframed[2] + -1 * (planeProperties.d + planeProperties.n[0] * positionReframed[0] + planeProperties.n[1]*positionReframed[1]) / planeProperties.n[2];
-        }
-        else {
+        } else {
             positionReframed[2] = 79 * pow(10, -9);
         }
     }
@@ -468,6 +481,7 @@ __declspec(dllexport) void frame_wall_set(bool input, double k_wall) {
 __declspec(dllexport) void signal_input(double input_signal, double input_gain) {
     signal = input_signal;
     gain = input_gain;
+
 }
 __declspec(dllexport) void surface_force_set(double* input, int setting) {
     surface_force = setting;
@@ -475,12 +489,12 @@ __declspec(dllexport) void surface_force_set(double* input, int setting) {
         k[i] = input[i];
     }
 }
-__declspec(dllexport) int8_t planing_set(bool reset, bool toggle) {
+__declspec(dllexport) int8_t planing_set(bool reset, bool toggle, double *output) {
     if (reset) {
         num_clicks = 0;
         planing.active = false;
     }
-    planing.toggle = toggle;    time_t time_current = time(NULL);
+    planing.toggle = toggle;
     int8_t x = num_clicks;
     return x;
 }
