@@ -1,2 +1,0 @@
-del /q "C:\Program Files\National Instruments\LabVIEW 2019\user.lib\Haptic Prog Interface"
-xcopy /s /y /i "C:\Users\freem\Documents\GitHub\HapticSPM\Haptic-Programming-Interface\LabVIEW VIs\Haptic Prog Interface" "C:\Program Files\National Instruments\LabVIEW 2019\user.lib\Haptic Prog Interface"
