@@ -1,2 +1,4 @@
 # Haptic-Programming-Interface
-Dynamic link library that interfaces the haptic device with LabVIEW.
+This repo includes
+- a dynamic link library (.dll) that defines functions to interface the haptic device with LabVIEW.
+- a LabVIEW library which provides a user-friendly way to access these functions.
