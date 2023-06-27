@@ -176,43 +176,62 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         break;
     case 2: //Write Mode
         switch (surface_force) {
-        case 0: //Log Force
+        case 0: //Linear Force
+            //Normal Mode
+            if (gain * signal < k[1]) {
+                force[1] = 0;
+            }
+            else {
+                force[1] = k[0] * 4 * log(gain * signal / k[1]);
+            }
+            /*
+            //Setpoint Potential Valley Mode
+            if (gain * signal >= k[1]) {
+                force[1] = k[0] * 4 * log(gain * signal / k[1]);
+            }
+            else if (gain * signal <= k[1]) {
+                force[1] = -k[0] * 4 * log((-gain * signal + 2*k[1]) / k[1]);
+            }
+            */
+            break;
+        case 1: //Coulomb Force
+            //Normal Mode
+            force[1] = k[0] * 10000 / pow((gain * signal - k[1]) * pow(10, 12) - 20 * sqrt(5), 2);
+            break;
+            //Setpoint Potential Valley Mode
+            /*
+            if (gain * signal < k[1]) {
+                force[1] = -(3 * k[0]) + k[0] * (10000 / (pow(((gain * signal - k[1]) * pow(10, 12)) - (100 / sqrt(3)), 2)));
+            }
+            else if (gain * signal > k[1]) {
+                force[1] = (3 * k[0]) + k[0] * (-10000 / (pow(((gain * signal - k[1]) * pow(10, 12)) + (100 / sqrt(3)), 2)));
+            }
+            */
+        case 2: //Lennard-Jones Potential w/ Exponential position scaling.
+            //Normal Mode
+            force[1] = -4*((pow(1000 * k[0] / ((gain * signal - k[1]) * pow(10,12) - 1000 * k[0]), 13) - pow(1000 * k[0] / ((gain * signal - k[1]) * pow(10, 12) - 1000 * k[0]), 7)));
+            break;
+        case 3: //Van der Waals Force
+            //Normal Mode
+            force[1] = k[0] * (- 1 * pow(10, 19)) / pow((gain * signal - k[1]) * pow(10, 12) - (pow(k[0], 1 / 7) * 442.7163232), 7);
+            break;
+        case 4: //Exponential Force
+            //Normal Mode
+            if (gain * signal <= k[1]) {
+                force[1] = 0;
+            }
+            else {
+                force[1] = k[0] * exp((signal * gain - k[1]) / k[1]) - k[0];
+            }
+            break;
+        default: //Linear Force
+            //Normal Mode
             if (gain * signal <= k[1]) {
                 force[1] = 0;
             }
             else {
                 force[1] = k[0] * 4 * log(gain * signal / k[1]);
             }
-                //force[1] = k[0] * 2.48218 * std::log(k[1] * (1 / k[2]) * gain * signal + 1);
-            break;
-        case 1: //Linear Force
-            force[1] = k[0] * gain * signal;
-        case 2: //Coulomb Force
-            if (gain * signal >= 300) {
-                force[1] = force_max[1];
-            }
-            else {
-                force[1] = k[0] * 100 / std::pow(lin(gain * signal) - 240, 2);
-            }
-            break;
-        case 3: //Lennard-Jones Potential w/ Exponential position scaling.
-            if (gain * signal >= 200) {
-                force[1] = force_max[1];
-            }
-            else {
-                force[1] = k[1] * -1.0 * 4.0 * 3.0 * ((6 * std::pow(50, 6)) / std::pow(fabs(10 * lin(gain * signal) - 240), 7) - (12 * std::pow(50, 12)) / std::pow(fabs(10 * lin(gain * signal) - 240), 13));
-            }
-            break;
-        case 4: //Van der Waals
-            if (gain * signal >= 300) {
-                force[1] = force_max[1];
-            }
-            else {
-                force[1] = k[0] * 1000 / std::pow(lin(gain * signal) - 240, 7);
-            }
-            break;
-        default: //Log
-            force[1] = k[0] * 2.48218 * std::log(k[1] * (1 / k[2]) * gain * signal + 1);
             break;
         }
         break;
