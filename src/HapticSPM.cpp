@@ -97,6 +97,10 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     hdGetDoublev(HD_CURRENT_POSITION, position);
     hdGetDoublev(HD_CURRENT_VELOCITY, velocity);
 
+    if (hdCheckCalibration() == HD_CALIBRATION_NEEDS_UPDATE) {
+        hdUpdateCalibration(HD_CALIBRATION_AUTO);
+    }
+
     //Calculate xy forces & drag forces
     if (wall_toggle) {
         if (position[0] < frame_haptic.center[0] - frame_haptic.size[0] / 2) {
@@ -184,36 +188,27 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             else {
                 force[1] = k[0] * 4 * log(gain * signal / k[1]);
             }
-            /*
-            //Setpoint Potential Valley Mode
-            if (gain * signal >= k[1]) {
-                force[1] = k[0] * 4 * log(gain * signal / k[1]);
-            }
-            else if (gain * signal <= k[1]) {
-                force[1] = -k[0] * 4 * log((-gain * signal + 2*k[1]) / k[1]);
-            }
-            */
             break;
         case 1: //Coulomb Force
             //Normal Mode
-            force[1] = k[0] * 10000 / pow((gain * signal - k[1]) * pow(10, 12) - 20 * sqrt(5), 2);
-            break;
-            //Setpoint Potential Valley Mode
+            force[1] = k[0] * (100000 / pow((((gain * signal - k[1]) * pow(10, 12)) - (100 * (sqrt(10 * k[0]) / sqrt(3)))), 2));
+            //Setpoint Maximum Mode
             /*
             if (gain * signal < k[1]) {
-                force[1] = -(3 * k[0]) + k[0] * (10000 / (pow(((gain * signal - k[1]) * pow(10, 12)) - (100 / sqrt(3)), 2)));
+                force[1] = k[0] * (100000 / pow((((gain * signal - k[1]) * pow(10, 12)) - (100 * (sqrt(10 * k[0]) / sqrt(3)))), 2));
             }
             else if (gain * signal > k[1]) {
-                force[1] = (3 * k[0]) + k[0] * (-10000 / (pow(((gain * signal - k[1]) * pow(10, 12)) + (100 / sqrt(3)), 2)));
+                force[1] = k[0] * (100000 / pow((((gain * signal - k[1]) * pow(10, 12)) + (100 * (sqrt(10 * k[0]) / sqrt(3)))), 2));
             }
             */
+            break;
         case 2: //Lennard-Jones Potential w/ Exponential position scaling.
             //Normal Mode
-            force[1] = -4*((pow(1000 * k[0] / ((gain * signal - k[1]) * pow(10,12) - 1000 * k[0]), 13) - pow(1000 * k[0] / ((gain * signal - k[1]) * pow(10, 12) - 1000 * k[0]), 7)));
+            force[1] = -1 * ((pow(2000 * k[0] / ((gain * signal - k[1]) * pow(10, 12) - (2000 * k[0])), 13) - pow(3000 * k[0] / ((gain * signal - k[1]) * pow(10, 12) - (3000 * k[0])), 7)));
             break;
         case 3: //Van der Waals Force
             //Normal Mode
-            force[1] = k[0] * (- 1 * pow(10, 19)) / pow((gain * signal - k[1]) * pow(10, 12) - (pow(k[0], 1 / 7) * 442.7163232), 7);
+            force[1] = k[0] * (-1 * pow(10, 21)) / pow((gain * signal - k[1]) * pow(10, 12) - (pow(k[0], 1/7) * pow(10, 21/7)), 7);
             break;
         case 4: //Exponential Force
             //Normal Mode
@@ -368,6 +363,7 @@ __declspec(dllexport) void stop_haptic_loop() {
     hdStopScheduler();
     hdUnschedule(hPlaneCallback);
     hdDisableDevice(hHD);
+
 }
 
 /*** PEN PROPERTIES ***/
@@ -467,7 +463,7 @@ __declspec(dllexport) void force_extrema_set(double* maxforce, double* minforce)
 }
 
 //Angles
-__declspec(dllexport) void angles_get(double *output) {
+__declspec(dllexport) void angles_get(double* output) {
     hduVector3Dd angles;
     hdGetDoublev(HD_CURRENT_GIMBAL_ANGLES, angles);
     output[0] = angles[0];
@@ -476,10 +472,16 @@ __declspec(dllexport) void angles_get(double *output) {
 }
 
 //Button State
-__declspec(dllexport) int8_t buttonstate_get() {
+__declspec(dllexport) void buttonstate_get(int state) {
+    HDint buttonState;
+    hdGetIntegerv(HD_CURRENT_BUTTONS, &buttonState);
+    state = buttonState;
+    
+    /*
     HDint nCurrentButtons;
     hdGetIntegerv(HD_CURRENT_BUTTONS, &nCurrentButtons);
-    return nCurrentButtons;
+    output = nCurrentButtons;
+    */
 }
 
 /*** OTHER ***/
