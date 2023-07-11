@@ -10,23 +10,23 @@
 	<Item Name="Base Module" Type="Folder">
 		<Item Name="Angles Get.vi" Type="VI" URL="../Base Module/Angles Get.vi"/>
 		<Item Name="Button State Get.vi" Type="VI" URL="../Base Module/Button State Get.vi"/>
-		<Item Name="Drag Force Set.vi" Type="VI" URL="../Base Module/Drag Force Set.vi"/>
-		<Item Name="Force Extrema Set.vi" Type="VI" URL="../Base Module/Force Extrema Set.vi"/>
-		<Item Name="Forces Get.vi" Type="VI" URL="../Base Module/Forces Get.vi"/>
+		<Item Name="Drag Force Set.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/Base Module/Drag Force Set.vi"/>
+		<Item Name="Force Extrema Set.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/Base Module/Force Extrema Set.vi"/>
+		<Item Name="Forces Get.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/Base Module/Forces Get.vi"/>
 		<Item Name="Forces Set.vi" Type="VI" URL="../Base Module/Forces Set.vi"/>
-		<Item Name="Position Get.vi" Type="VI" URL="../Base Module/Position Get.vi"/>
-		<Item Name="Safety Trigger.vi" Type="VI" URL="../Base Module/Safety Trigger.vi"/>
+		<Item Name="Position Get.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/Base Module/Position Get.vi"/>
+		<Item Name="Safety Trigger.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/Base Module/Safety Trigger.vi"/>
 		<Item Name="Velocity Get.vi" Type="VI" URL="../Base Module/Velocity Get.vi"/>
 	</Item>
 	<Item Name="SPM Module" Type="Folder">
-		<Item Name="Frame Wall Set.vi" Type="VI" URL="../SPM Module/Frame Wall Set.vi"/>
-		<Item Name="Planing Set.vi" Type="VI" URL="../SPM Module/Planing Set.vi"/>
-		<Item Name="Position (Reframed) Get.vi" Type="VI" URL="../SPM Module/Position (Reframed) Get.vi"/>
-		<Item Name="Signal Input.vi" Type="VI" URL="../SPM Module/Signal Input.vi"/>
-		<Item Name="Surface Force Set.vi" Type="VI" URL="../SPM Module/Surface Force Set.vi"/>
+		<Item Name="Frame Wall Set.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/SPM Module/Frame Wall Set.vi"/>
+		<Item Name="Planing Set.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/SPM Module/Planing Set.vi"/>
+		<Item Name="Position (Reframed) Get.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/SPM Module/Position (Reframed) Get.vi"/>
+		<Item Name="Signal Input.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/SPM Module/Signal Input.vi"/>
+		<Item Name="Surface Force Set.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/SPM Module/Surface Force Set.vi"/>
 		<Item Name="Velocity (Reframed) Get.vi" Type="VI" URL="../SPM Module/Velocity (Reframed) Get.vi"/>
 	</Item>
-	<Item Name="Start Haptic Loop.vi" Type="VI" URL="../Start Haptic Loop.vi"/>
+	<Item Name="Start Haptic Loop.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/Start Haptic Loop.vi"/>
 	<Item Name="Stop Haptic Loop.vi" Type="VI" URL="../Stop Haptic Loop.vi"/>
 	<Item Name="Tree.vi" Type="VI" URL="../Tree.vi"/>
 </Library>
