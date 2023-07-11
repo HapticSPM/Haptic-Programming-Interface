@@ -204,7 +204,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             break;
         case 2: //Lennard-Jones Potential w/ Exponential position scaling.
             //Normal Mode
-            force[1] = -k[0] * ((pow(1000 * k[0] / ((gain * signal - k[1]) * pow(10, 12) - (1000 * k[0])), 13) - pow(4000 * k[0] / ((gain * signal - k[1]) * pow(10, 12) - (4000 * k[0])), 7)));
+            force[1] = -1 * ((pow(2000 * k[0] / ((gain * signal - k[1]) * pow(10, 12) - (2000 * k[0])), 13) - pow(3000 * k[0] / ((gain * signal - k[1]) * pow(10, 12) - (3000 * k[0])), 7)));
             break;
         case 3: //Van der Waals Force
             //Normal Mode
