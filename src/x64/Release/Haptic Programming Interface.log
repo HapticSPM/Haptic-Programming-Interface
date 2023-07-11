@@ -1,0 +1,11 @@
+﻿  pch.cpp
+  dllmain.cpp
+  HapticSPM.cpp
+     Creating library C:\Users\freem\Documents\GitHub\Haptic-Programming-Interface\src\x64\Release\Haptic Programming Interface.lib and object C:\Users\freem\Documents\GitHub\Haptic-Programming-Interface\src\x64\Release\Haptic Programming Interface.exp
+  Generating code
+  Previous IPDB not found, fall back to full compilation.
+  All 43 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+hdu.lib(hduError.obj) : warning LNK4099: PDB '' was not found with 'hdu.lib(hduError.obj)' or at ''; linking object as if no debug info
+hdu.lib(hduAfx.obj) : warning LNK4099: PDB '' was not found with 'hdu.lib(hduAfx.obj)' or at ''; linking object as if no debug info
+  Haptic Programming Interface.vcxproj -> C:\Users\freem\Documents\GitHub\Haptic-Programming-Interface\src\x64\Release\Haptic Programming Interface.dll
