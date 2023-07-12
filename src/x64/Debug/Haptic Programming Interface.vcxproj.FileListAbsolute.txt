@@ -1,1 +1,2 @@
 C:\Users\cjwel\Documents\GitHub\Haptic-Programming-Interface\src\x64\Debug\Haptic Programming Interface.dll
+C:\Users\freem\Documents\GitHub\Haptic-Programming-Interface\src\x64\Debug\Haptic Programming Interface.dll

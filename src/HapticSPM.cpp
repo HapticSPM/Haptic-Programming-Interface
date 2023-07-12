@@ -380,10 +380,10 @@ __declspec(dllexport) void position_reframed_get(double* frame_properties, bool 
     double positionReframed[3] = {position[0], position[2], position[1]};
 
     //planing
-    if (planing.toggle && num_clicks == 2 && planing.active) {
+    if (planing.toggle && num_clicks == 3 && planing.active) {
         if (mode == 2) {
-            positionReframed[2] = positionReframed[2] + (planeProperties.d - planeProperties.n[0] * positionReframed[0] - planeProperties.n[1]*positionReframed[1]) / planeProperties.n[2];
-        } 
+            positionReframed[2] = positionReframed[2] + (planeProperties.d - planeProperties.n[0] * positionReframed[0] - planeProperties.n[1] * positionReframed[1]) / planeProperties.n[2] + 100;
+        }
         else {
             positionReframed[2] = 79 * pow(10, -9);
         }
@@ -402,12 +402,7 @@ __declspec(dllexport) void position_reframed_get(double* frame_properties, bool 
     positionReframed[0] = frame_size_nano[0] / frame_haptic.size[0] * (positionReframed[0] - frame_haptic.center[0]) + frame_center_nano[0];
     positionReframed[1] = -1 * frame_size_nano[1] / frame_haptic.size[1] * (positionReframed[1] - frame_haptic.center[1]) + frame_center_nano[1];
 
-    //zscaling
     if (mode == 2) {
-        //puts floor at -50 mm down (remove if unnecessary)
-        if (positionReframed[2] < -50) {
-            positionReframed[2] = -50;
-        }
         positionReframed[2] = 1 / pos_gain * std::pow(10, -12) * positionReframed[2] + surface_location;
     }
 
