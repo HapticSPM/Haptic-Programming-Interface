@@ -8,7 +8,7 @@
 
 </Property>
 	<Item Name="Base Module" Type="Folder">
-		<Item Name="Angles Get.vi" Type="VI" URL="../Base Module/Angles Get.vi"/>
+		<Item Name="Angles Get.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/Base Module/Angles Get.vi"/>
 		<Item Name="Button State Get.vi" Type="VI" URL="../Base Module/Button State Get.vi"/>
 		<Item Name="Drag Force Set.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/Base Module/Drag Force Set.vi"/>
 		<Item Name="Force Extrema Set.vi" Type="VI" URL="/&lt;userlib&gt;/Haptic Prog Interface/Base Module/Force Extrema Set.vi"/>
