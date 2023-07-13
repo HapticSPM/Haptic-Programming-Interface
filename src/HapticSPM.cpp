@@ -192,15 +192,6 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         case 1: //Coulomb Force
             //Normal Mode
             force[1] = k[0] * (100000 / pow((((gain * signal - k[1]) * pow(10, 12)) - (100 * (sqrt(10 * k[0]) / sqrt(3)))), 2));
-            //Setpoint Maximum Mode
-            /*
-            if (gain * signal < k[1]) {
-                force[1] = k[0] * (100000 / pow((((gain * signal - k[1]) * pow(10, 12)) - (100 * (sqrt(10 * k[0]) / sqrt(3)))), 2));
-            }
-            else if (gain * signal > k[1]) {
-                force[1] = k[0] * (100000 / pow((((gain * signal - k[1]) * pow(10, 12)) + (100 * (sqrt(10 * k[0]) / sqrt(3)))), 2));
-            }
-            */
             break;
         case 2: //Lennard-Jones Potential w/ Exponential position scaling.
             //Normal Mode
