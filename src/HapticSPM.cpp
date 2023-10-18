@@ -181,7 +181,6 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     case 2: //Write Mode
         switch (surface_force) {
         case 0: //Linear Force
-            //Normal Mode
             if (gain * signal < k[1]) {
                 force[1] = 0;
             }
@@ -190,20 +189,16 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             }
             break;
         case 1: //Coulomb Force
-            //Normal Mode
             force[1] = k[0] * (100000 / pow((((gain * signal - k[1]) * pow(10, 12)) - (100 * (sqrt(10 * k[0]) / sqrt(3)))), 2));
             break;
-        case 2: //Lennard-Jones Potential w/ Exponential position scaling.
-            //Normal Mode
-            //force[1] = -4 * k[0] * (((12 * pow(100, 12)) / pow((gain * signal - k[1]) * pow(10, 12), 13)) - ((6 * pow(100, 6)) / pow((gain * signal - k[1]) * pow(10, 12), 7)));
-            force[1] = -1 * ((pow(2000 * k[0] / ((gain * signal - k[1]) * pow(10, 12) - (2000 * k[0])), 13) - pow(2000 * k[0] / ((gain * signal - k[1]) * pow(10, 12) - (2000 * k[0])), 7)));
+        case 2: //Lennard-Jones Potential w/ Exponential Position Scaling.
+            //force[1] = -4 * k[0] * ((12 * pow(2000 * k[0], 13)) / (pow((((gain * signal - k[1]) * pow(10, 12)) - (pow(12, (1 / 12)) * 2000 * k[0])), 13)) - (6 * pow(2000 * k[0], 7)) / (pow((((gain * signal - k[1]) * pow(10, 12)) - (pow(6, (1 / 6)) * 2000 * k[0])), 7)));
+            force[1] = -6 * k[0] * ((12 * pow(2000 * k[0], 13)) / (pow((((gain * signal - k[1]) * pow(10, 12)) - (2460.151 * k[0])), 13)) - (6 * pow(2000 * k[0], 7)) / (pow((((gain * signal - k[1]) * pow(10, 12)) - (2696.012 * k[0])), 7)));
             break;
         case 3: //Van der Waals Force
-            //Normal Mode
             force[1] = k[0] * (-1 * pow(10, 21)) / pow((gain * signal - k[1]) * pow(10, 12) - (pow(k[0], 1/7) * pow(10, 21/7)), 7);
             break;
         case 4: //Exponential Force
-            //Normal Mode
             if (gain * signal <= k[1]) {
                 force[1] = 0;
             }
@@ -212,13 +207,35 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             }
             break;
         default: //Linear Force
-            //Normal Mode
             if (gain * signal <= k[1]) {
                 force[1] = 0;
             }
             else {
                 force[1] = k[0] * 4 * log(gain * signal / k[1]);
             }
+            break;
+        }
+        break;
+    case 3: //Virtual Mode
+        switch (surface_force) {
+        case 0: //Linear Force
+            force[1] = 0;
+            break;
+        case 1: //Coulomb Force
+            force[1] = 0;
+            break;
+        case 2: //Lennard-Jones Potential w/ Exponential Position Scaling
+            force[1] = 0;
+            //force[1] = -4 * k[0] * (((12 * pow(100, 12)) / pow((gain * signal - k[1]) * pow(10, 12), 13)) - ((6 * pow(100, 6)) / pow((gain * signal - k[1]) * pow(10, 12), 7)));
+            break;
+        case 3: //Van der Waals Force
+            force[1] = 0;
+            break;
+        case 4: //Exponential Force
+            force[1] = 0;
+            break;
+        default: //Linear Force
+            force[1] = 0;
             break;
         }
         break;
@@ -304,6 +321,7 @@ __declspec(dllexport) int start_haptic_loop(int input)
         //0: Read mode
         //1: STM Write mode
         //2: AFM Write mode 
+        //3: Virtual mode
     mode = input;
     
     // Main start function
@@ -394,7 +412,7 @@ __declspec(dllexport) void position_reframed_get(double* frame_properties, bool 
     positionReframed[0] = frame_size_nano[0] / frame_haptic.size[0] * (positionReframed[0] - frame_haptic.center[0]) + frame_center_nano[0];
     positionReframed[1] = -1 * frame_size_nano[1] / frame_haptic.size[1] * (positionReframed[1] - frame_haptic.center[1]) + frame_center_nano[1];
 
-    if (mode == 2) {
+    if (mode == 2 or mode == 3) {
         positionReframed[2] = 1 / pos_gain * std::pow(10, -12) * positionReframed[2] + surface_location;
     }
 
