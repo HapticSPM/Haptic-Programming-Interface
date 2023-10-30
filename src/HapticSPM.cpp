@@ -219,17 +219,22 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     case 3: //Virtual Mode
         switch (surface_force) {
         case 0: //Linear Force
-            force[1] = 0;
+            if (gain * signal > (k[1] * pow(10, 12))) {
+                force[1] = 0;
+            }
+            else {
+                force[1] = ((-3 * k[0] * gain * signal) / (k[1] * pow(10, 12))) + (3 * k[0]); 
+            }
             break;
         case 1: //Coulomb Force
-            force[1] = 0;
+            force[1] = (3 * 4 * (k[1] * pow(10, 12) * k[0])) / (pow(gain * signal + pow(k[0] * 4 * (k[1] * pow(10, 12)), 1 / 2), 2));
             break;
         case 2: //Lennard-Jones Potential w/ Exponential Position Scaling
-            force[1] = 0;
+            force[1] = 4 * k[0] * (((12 * pow(k[1] * pow(10, 12), 13)) / (pow(gain * signal + (k[1] * pow(10, 12)), 13))) - ((6 * pow(k[1] * pow(10, 12), 7)) / (pow(gain * signal + (k[1] * pow(10, 12)), 7))));
             //force[1] = -4 * k[0] * (((12 * pow(100, 12)) / pow((gain * signal - k[1]) * pow(10, 12), 13)) - ((6 * pow(100, 6)) / pow((gain * signal - k[1]) * pow(10, 12), 7)));
             break;
         case 3: //Van der Waals Force
-            force[1] = 0;
+            force[1] = 4 * k[0] * ((12 * pow(2 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (1.23 * 2 * k[1] * pow(10, 12)), 13)));
             break;
         case 4: //Exponential Force
             force[1] = 0;
