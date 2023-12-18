@@ -127,7 +127,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(OH_SDK_BASE)\include;$(OH_SDK_BASE)\utilities\include;.\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OH_SDK_BASE)\include;$(OH_SDK_BASE)\utilities\include;$(OH_SDK_BASE)\HD\hd.h;$(OH_SDK_BASE)\HDU\hduVector.h;$(OH_SDK_BASE)\HDU\hduError.h;.\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
