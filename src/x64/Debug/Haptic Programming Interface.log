@@ -1,8 +1,2 @@
-﻿  pch.cpp
-  dllmain.cpp
-  HapticSPM.cpp
-  Generating Code...
-hdu.lib(hduError.obj) : warning LNK4099: PDB '' was not found with 'hdu.lib(hduError.obj)' or at ''; linking object as if no debug info
-hdu.lib(hduAfx.obj) : warning LNK4099: PDB '' was not found with 'hdu.lib(hduAfx.obj)' or at ''; linking object as if no debug info
-     Creating library C:\Users\cjwel\Documents\GitHub\Haptic-Programming-Interface\src\x64\Debug\Haptic Programming Interface.lib and object C:\Users\cjwel\Documents\GitHub\Haptic-Programming-Interface\src\x64\Debug\Haptic Programming Interface.exp
+﻿  HapticSPM.cpp
   Haptic Programming Interface.vcxproj -> C:\Users\cjwel\Documents\GitHub\Haptic-Programming-Interface\src\x64\Debug\Haptic Programming Interface.dll
