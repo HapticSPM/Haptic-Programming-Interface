@@ -3,6 +3,7 @@
 #include <utility>
 #include <limits.h>
 #include <ctime>
+#include <cmath>
 #include "HapticSPM.h" // where exported functions are declared
 
 #ifdef  _WIN64
@@ -216,7 +217,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             break;
         }
         break;
-    case 3: //Virtual Mode
+    case 3: //Position Mode
         switch (surface_force) {
         case 0: //Linear Force
             if (gain * signal > (k[1] * pow(10, 12))) {
@@ -248,11 +249,21 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         case 0: //Lennard-Jones Potential w/ Exponential Position Scaling
             force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));
             break;
-        case 1: //Covalent
-            force[1] = 0;
+        case 1: //Covalent Attractive
+            if (gain * signal > 0) {
+                force[1] = (-k[1] * pow(10, 12) * exp(-k[0] * pow(10, -2) * gain * signal)) / (gain * signal);
+            }
+            else {
+                force[1] = force_min[2];
+            }
             break;
-        case 2: //Coulomb
-            force[1] = 0;
+        case 2: //Coulomb Repulsive
+            if (gain * signal > 0) {
+                force[1] = (k[1] * pow(10, 12)) / pow((gain * signal / (5 * k[0])) + 5 * k[0], 2);
+            }
+            else {
+                force[1] = force_max[2];
+            }
             break;
         default: //Lennard-Jones Potential w/ Exponential Position Scaling
             force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));            break;
@@ -341,6 +352,7 @@ __declspec(dllexport) int start_haptic_loop(int input)
         //1: STM Write mode
         //2: AFM Write mode 
         //3: Virtual mode
+        //4: Force Only Mode
     mode = input;
     
     // Main start function
