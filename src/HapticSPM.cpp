@@ -25,7 +25,7 @@
 /***** BEGIN GLOBAL VARIABLES *****/
 /*** HAPTIC FRAME PROPERTIES ***/ 
 struct {
-    const double center[2] = { 0 , 20 };
+    const double center[2] = { 0, 20 };
     const double size[2] = { 120, 120 };
 } frame_haptic;
 
@@ -80,6 +80,7 @@ double lin(double xv) {
     }
 }
 
+hduVector3Dd spherePosition(frame_haptic.center[0], 0, frame_haptic.center[1]);
 hduVector3Dd plane_points[3];
 
 /*** HAPTIC CALLBACK ***/
@@ -90,13 +91,15 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     const double time_interval = 2;
     const double force_trigger = 2;
     
-
     hduVector3Dd force;
 
     hdBeginFrame(hdGetCurrentDevice());
 
     hdGetDoublev(HD_CURRENT_POSITION, position);
     hdGetDoublev(HD_CURRENT_VELOCITY, velocity);
+
+    double sphereRadius = (k[1] * pow(10, 12));
+    double distance = (position - spherePosition).magnitude();
 
     if (hdCheckCalibration() == HD_CALIBRATION_NEEDS_UPDATE) {
         hdUpdateCalibration(HD_CALIBRATION_AUTO);
@@ -186,7 +189,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
                 force[1] = 0;
             }
             else {
-                force[1] = k[0] * 4 * log(gain * signal / k[1]);
+                force[1] = (k[0] * 4) * log(gain * signal / k[1]);
             }
             break;
         case 1: //Coulomb Force
@@ -241,13 +244,29 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             force[1] = k[0] * exp(-1 * ((gain * signal - (k[1] * pow(10, 12))) / (k[1] * pow(10, 12))));
             break;
         default: //Lennard-Jones Potential w/ Exponential Position Scaling
-            force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));            break;
+            force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));            
+            break;
         }
         break;
     case 4: //Force Mode
         switch (surface_force) {
-        case 0: //Lennard-Jones Potential w/ Exponential Position Scaling
-            force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));
+        case 0: //Null Force
+            if (distance < sphereRadius) {
+                // Calculate the penetration distance.
+                double penetrationDistance = sphereRadius - distance;
+
+                // Create a unit vector in the direction of the force, this will always 
+                // be outward from the center of the sphere through the user's position.
+                hduVector3Dd forceDirection = (position - spherePosition) / distance;
+
+                // Use F=kx to create a force vector that is away from the center of 
+                // the sphere and proportional to the penetration distance, and scaled 
+                // by the object stiffness. Hooke's law explicitly: 
+                force = k[0] * penetrationDistance * forceDirection;
+            }
+            if (position[1] < 0) {
+                force[1] = wall_stiffness * (-position[1]);
+            }
             break;
         case 1: //Covalent Attractive
             if (gain * signal > 0) {
@@ -265,8 +284,20 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
                 force[1] = force_max[2];
             }
             break;
+        case 3: //Coulomb Repulsive
+            if (gain * signal > 0) {
+                force[1] = -(k[1] * pow(10, 12)) / pow((gain * signal / (5 * k[0])) + 5 * k[0], 2);
+            }
+            else {
+                force[1] = force_min[2];
+            }
+            break;
+        case 4: //Lennard-Jones Potential w/ Exponential Position Scaling
+            force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));
+            break;
         default: //Lennard-Jones Potential w/ Exponential Position Scaling
-            force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));            break;
+            force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));            
+            break;
         }
         break;
     }
