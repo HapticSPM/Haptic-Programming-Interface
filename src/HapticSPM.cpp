@@ -100,6 +100,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 
     double sphereRadius = (k[1] * pow(10, 12));
     double distance = (position - spherePosition).magnitude();
+    double penetrationDistance = sphereRadius - distance;
 
     if (hdCheckCalibration() == HD_CALIBRATION_NEEDS_UPDATE) {
         hdUpdateCalibration(HD_CALIBRATION_AUTO);
@@ -156,7 +157,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
         if (position[1] <= gain * signal_planed) {
             double penetrationDistance;
             penetrationDistance = fabs(position[1] - gain * signal_planed);
-            
+
             switch (surface_force) {
             case 0: //Linear Force
                 force[1] = k[0] * penetrationDistance;
@@ -200,7 +201,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             force[1] = -6 * k[0] * ((12 * pow(2000 * k[0], 13)) / (pow((((gain * signal - k[1]) * pow(10, 12)) - (2460.151 * k[0])), 13)) - (6 * pow(2000 * k[0], 7)) / (pow((((gain * signal - k[1]) * pow(10, 12)) - (2696.012 * k[0])), 7)));
             break;
         case 3: //Van der Waals Force
-            force[1] = k[0] * (-1 * pow(10, 21)) / pow((gain * signal - k[1]) * pow(10, 12) - (pow(k[0], 1/7) * pow(10, 21/7)), 7);
+            force[1] = k[0] * (-1 * pow(10, 21)) / pow((gain * signal - k[1]) * pow(10, 12) - (pow(k[0], 1 / 7) * pow(10, 21 / 7)), 7);
             break;
         case 4: //Exponential Force
             if (gain * signal <= k[1]) {
@@ -227,7 +228,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
                 force[1] = 0;
             }
             else {
-                force[1] = ((-3 * k[0] * gain * signal) / (k[1] * pow(10, 12))) + (3 * k[0]); 
+                force[1] = ((-3 * k[0] * gain * signal) / (k[1] * pow(10, 12))) + (3 * k[0]);
             }
             break;
         case 1: //Coulomb Force
@@ -244,11 +245,11 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             force[1] = k[0] * exp(-1 * ((gain * signal - (k[1] * pow(10, 12))) / (k[1] * pow(10, 12))));
             break;
         default: //Lennard-Jones Potential w/ Exponential Position Scaling
-            force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));            
+            force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));
             break;
         }
         break;
-    case 4: //Force Mode
+    case 4: //1D Force Mode
         switch (surface_force) {
         case 0: //Null Force
             if (distance < sphereRadius) {
@@ -262,7 +263,8 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
                 // Use F=kx to create a force vector that is away from the center of 
                 // the sphere and proportional to the penetration distance, and scaled 
                 // by the object stiffness. Hooke's law explicitly: 
-                force = k[0] * penetrationDistance * forceDirection;
+                hduVector3Dd r = penetrationDistance * forceDirection;
+                force = k[0] * r;
             }
             if (position[1] < 0) {
                 force[1] = wall_stiffness * (-position[1]);
@@ -296,10 +298,49 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));
             break;
         default: //Lennard-Jones Potential w/ Exponential Position Scaling
-            force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));            
+            force[1] = 4 * k[0] * 0.2 * (((12 * pow(4 * k[1] * pow(10, 12), 13)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 13))) - ((6 * pow(4 * k[1] * pow(10, 12), 7)) / (pow(gain * signal + (4.3 * k[1] * pow(10, 12)), 7))));
             break;
         }
         break;
+    case 5: //3D Force Mode Spherical
+        hduVector3Dd forceDirection = (position - spherePosition) / distance;
+        switch (surface_force) {
+        case 0: //Spring Force
+            if (distance < sphereRadius) {
+                hduVector3Dd r = penetrationDistance * forceDirection;
+                force = k[0] * r;
+            }
+            break;
+        case 1: //Coulomb Repulsion
+            if (distance < sphereRadius) {
+                hduVector3Dd r = ((1000 * pow(penetrationDistance - k[1] * pow(10, 12), -2)) - (1000 * pow(k[1] * pow(10, 12), -2))) * forceDirection;
+                force = k[0] * r;
+            }
+            break;
+        case 2: //Lennard-Jones
+            if (distance < sphereRadius) {
+                hduVector3Dd r = (pow(100 / (penetrationDistance - 2.2 * k[1] * pow(10, 12)), 13) - pow(107 / (penetrationDistance - 2.2 * k[1] * pow(10, 12)), 7)) * forceDirection;
+                force = -4 * k[0] * r;
+            }
+            break;
+        case 3: //Coulomb Attraction v1
+            /*if (distance < sphereRadius) {
+                double scaleFactor = 1 + (sqrt(2500) * k[0] / (k[1] * pow(10, 12)));
+                hduVector3Dd r = (10000 * pow(penetrationDistance - scaleFactor * k[1] * pow(10, 12), -2) - 4) * forceDirection;
+                force = k[0] * r;
+            }*/
+            if (distance < sphereRadius) {
+                hduVector3Dd r = (1000 / pow(penetrationDistance - 1.25 * k[1] * pow(10, 12), 2) - 100 / pow(penetrationDistance - 1.075 * k[1] * pow(10, 12), 2)) * forceDirection;
+                force = -k[0] * r;
+            }
+            break;
+        default: //Spring Force
+            if (distance < sphereRadius) {
+                hduVector3Dd r = penetrationDistance * forceDirection;
+                force = k[0] * r;
+            }
+            break;
+        }
     }
 
     //Checks if the calculated forces are within the range of acceptable forces, and, if not, coerces them to within the range.
