@@ -224,12 +224,31 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     case 3: //Position Mode
         switch (surface_force) {
         case 0: //Linear Force
-            if (gain * signal > (k[1] * pow(10, 12))) {
+            /*if (position[1] < gain * signal) {
+                double x = position[1] - gain * signal;
+                force[1] = -(gain * signal / 8.3) * k[0] * x;
+            }
+            else {
+                force[1] = 0;
+            }*/
+            if (position[1] < signal && signal > gain * 0.975) {
+                double x = position[1] - signal;
+                force[1] = -k[0] * x;
+            }
+            else if (position[1] < signal && signal < gain * 0.975) {
+                double x = position[1] - signal;
+                force[1] = -(k[1] * pow(10, 12)) * (0.01) * k[0] * x;
+            }
+            else {
+                force[1] = 0;
+            }
+
+            /*if (gain * signal > (k[1] * pow(10, 12))) {
                 force[1] = 0;
             }
             else {
                 force[1] = ((-3 * k[0] * gain * signal) / (k[1] * pow(10, 12))) + (3 * k[0]);
-            }
+            }*/
             break;
         case 1: //Coulomb Force
             force[1] = (3 * 4 * (k[1] * pow(10, 12) * k[0])) / (pow(gain * signal + pow(k[0] * 4 * (k[1] * pow(10, 12)), 1 / 2), 2));
@@ -319,19 +338,11 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             break;
         case 2: //Lennard-Jones
             if (distance < sphereRadius) {
-                hduVector3Dd r = (pow(100 / (penetrationDistance - 2.2 * k[1] * pow(10, 12)), 13) - pow(107 / (penetrationDistance - 2.2 * k[1] * pow(10, 12)), 7)) * forceDirection;
+                /*hduVector3Dd r = (pow(100 / (penetrationDistance - 2.2 * k[1] * pow(10, 12)), 13) - pow(107 / (penetrationDistance - 2.2 * k[1] * pow(10, 12)), 7)) * forceDirection;
                 force = -4 * k[0] * r;
-            }
-            break;
-        case 3: //Coulomb Attraction v1
-            /*if (distance < sphereRadius) {
-                double scaleFactor = 1 + (sqrt(2500) * k[0] / (k[1] * pow(10, 12)));
-                hduVector3Dd r = (10000 * pow(penetrationDistance - scaleFactor * k[1] * pow(10, 12), -2) - 4) * forceDirection;
-                force = k[0] * r;
-            }*/
-            if (distance < sphereRadius) {
-                hduVector3Dd r = (1000 / pow(penetrationDistance - 1.25 * k[1] * pow(10, 12), 2) - 100 / pow(penetrationDistance - 1.075 * k[1] * pow(10, 12), 2)) * forceDirection;
-                force = -k[0] * r;
+                */
+                hduVector3Dd r = (pow(k[1] * pow(10, 12) / (penetrationDistance - 1.75 * k[1] * pow(10, 12)), 13) - pow(k[1] * pow(10, 12) / (penetrationDistance - 1.75 * k[1] * pow(10, 12)), 7)) * forceDirection;
+                force = -10 * k[0] * r;
             }
             break;
         default: //Spring Force
@@ -424,7 +435,8 @@ __declspec(dllexport) int start_haptic_loop(int input)
         //1: STM Write mode
         //2: AFM Write mode 
         //3: Virtual mode
-        //4: Force Only Mode
+        //4: 1D Force Only mode
+        //5: 3D Sphere Force mode
     mode = input;
     
     // Main start function
