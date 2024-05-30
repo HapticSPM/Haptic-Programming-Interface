@@ -28,6 +28,6 @@ extern "C" __declspec(dllexport) void buttonstate_get(int state);
 /*** OTHER ***/
 extern "C" __declspec(dllexport) void safety_trigger(bool input, bool* output);
 extern "C" __declspec(dllexport) void frame_wall_set(bool input, double k_wall);
-extern "C" __declspec(dllexport) void signal_input(double input_signal, double input_gain);
+extern "C" __declspec(dllexport) void signal_input(double input_signal, double input_gain, double input_max);
 extern "C" __declspec(dllexport) void surface_force_set(double* input, int setting);
 extern "C" __declspec(dllexport) int8_t planing_set(bool reset, bool toggle, double* output);

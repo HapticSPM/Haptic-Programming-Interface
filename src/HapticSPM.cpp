@@ -32,6 +32,7 @@ struct {
 /*** HAPTIC DEVICE PROPERTIES ***/
 hduVector3Dd position; //units of mm
 hduVector3Dd velocity; //units of mm/s
+HDint buttonState;
 
 /*** OTHER ***/
 hduVector3Dd force_labview;
@@ -48,6 +49,7 @@ double force_min[3] = { -3, -3, -3 };
 
 double signal = 0;
 double gain = 1;
+double max = 0;
 
 double k[4] = { 1, 1, 1, 1 };
 
@@ -97,6 +99,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 
     hdGetDoublev(HD_CURRENT_POSITION, position);
     hdGetDoublev(HD_CURRENT_VELOCITY, velocity);
+    hdGetIntegerv(HD_CURRENT_BUTTONS, &buttonState);
 
     double sphereRadius = (k[1] * pow(10, 12));
     double distance = (position - spherePosition).magnitude();
@@ -224,25 +227,17 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
     case 3: //Position Mode
         switch (surface_force) {
         case 0: //Linear Force
-            /*if (position[1] < gain * signal) {
-                double x = position[1] - gain * signal;
-                force[1] = -(gain * signal / 8.3) * k[0] * x;
-            }
-            else {
-                force[1] = 0;
-            }*/
-            if (position[1] < signal && signal > gain * 0.975) {
-                double x = position[1] - signal;
+            if (position[1] < gain * signal && gain * signal > max * 0.975) {
+                double x = position[1] - gain* signal;
                 force[1] = -k[0] * x;
             }
-            else if (position[1] < signal && signal < gain * 0.975) {
-                double x = position[1] - signal;
+            else if (position[1] < gain * signal && gain * signal < max * 0.975) {
+                double x = position[1] - gain * signal;
                 force[1] = -(k[1] * pow(10, 12)) * (0.01) * k[0] * x;
             }
             else {
                 force[1] = 0;
             }
-
             /*if (gain * signal > (k[1] * pow(10, 12))) {
                 force[1] = 0;
             }
@@ -594,8 +589,6 @@ __declspec(dllexport) void angles_get(double* output) {
 
 //Button State
 __declspec(dllexport) void buttonstate_get(int state) {
-    HDint buttonState;
-    hdGetIntegerv(HD_CURRENT_BUTTONS, &buttonState);
     state = buttonState;
     
     /*
@@ -620,10 +613,10 @@ __declspec(dllexport) void frame_wall_set(bool input, double k_wall) {
     wall_toggle = input;
     wall_stiffness = k_wall;
 }
-__declspec(dllexport) void signal_input(double input_signal, double input_gain) {
+__declspec(dllexport) void signal_input(double input_signal, double input_gain, double input_max) {
     signal = input_signal;
     gain = input_gain;
-
+    max = input_max;
 }
 __declspec(dllexport) void surface_force_set(double* input, int setting) {
     surface_force = setting;
