@@ -32,7 +32,6 @@ struct {
 /*** HAPTIC DEVICE PROPERTIES ***/
 hduVector3Dd position; //units of mm
 hduVector3Dd velocity; //units of mm/s
-HDint buttonState;
 
 /*** OTHER ***/
 hduVector3Dd force_labview;
@@ -99,7 +98,6 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
 
     hdGetDoublev(HD_CURRENT_POSITION, position);
     hdGetDoublev(HD_CURRENT_VELOCITY, velocity);
-    hdGetIntegerv(HD_CURRENT_BUTTONS, &buttonState);
 
     double sphereRadius = (k[1] * pow(10, 12));
     double distance = (position - spherePosition).magnitude();
@@ -234,7 +232,12 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
             else if (position[1] < gain * signal && gain * signal < max * 0.975) {
                 double x = position[1] - gain * signal;
                 force[1] = -(k[1] * pow(10, 12)) * (0.01) * k[0] * x;
+                force[0] = -8 * k_drag[0] * velocity[0] + force[0];
+                force[2] = -8 * k_drag[2] * velocity[2] + force[2];
             }
+
+            // try another else if statement here to make the lower wells stickier
+
             else {
                 force[1] = 0;
             }
@@ -280,8 +283,8 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
                 hduVector3Dd r = penetrationDistance * forceDirection;
                 force = k[0] * r;
             }
-            if (position[1] < 0) {
-                force[1] = wall_stiffness * (-position[1]);
+            if (position[1] < -sphereRadius) {
+                force[1] = wall_stiffness * 2 * (-position[1] - sphereRadius);
             }
             break;
         case 1: //Covalent Attractive
@@ -300,7 +303,7 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
                 force[1] = force_max[2];
             }
             break;
-        case 3: //Coulomb Repulsive
+        case 3: //Coulomb Attractive
             if (gain * signal > 0) {
                 force[1] = -(k[1] * pow(10, 12)) / pow((gain * signal / (5 * k[0])) + 5 * k[0], 2);
             }
@@ -339,6 +342,15 @@ HDCallbackCode HDCALLBACK FrictionlessPlaneCallback(void* data)
                 hduVector3Dd r = (pow(k[1] * pow(10, 12) / (penetrationDistance - 1.75 * k[1] * pow(10, 12)), 13) - pow(k[1] * pow(10, 12) / (penetrationDistance - 1.75 * k[1] * pow(10, 12)), 7)) * forceDirection;
                 force = -10 * k[0] * r;
             }
+            break;
+        case 3: //test atom surface
+            if (distance > sphereRadius) {
+                hduVector3Dd r = penetrationDistance * forceDirection;
+                force = k[0] * r;
+            }
+            /*if (position[1] < 0) {
+                force[1] = wall_stiffness * -position[1];
+            }*/
             break;
         default: //Spring Force
             if (distance < sphereRadius) {
@@ -589,6 +601,8 @@ __declspec(dllexport) void angles_get(double* output) {
 
 //Button State
 __declspec(dllexport) void buttonstate_get(int state) {
+    HDint buttonState;
+    hdGetIntegerv(HD_CURRENT_BUTTONS, &buttonState);
     state = buttonState;
     
     /*
